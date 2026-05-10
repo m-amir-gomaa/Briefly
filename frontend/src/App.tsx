@@ -3,6 +3,7 @@ import AppLayout from './components/layout/AppLayout'
 import AccountView from './views/Account'
 import AuthView from './views/Auth'
 import DashboardView from './views/Dashboard'
+import HomeView from './views/Home'
 import IntakeView from './views/Intake'
 import IntakeDetailView from './views/IntakeDetail'
 import PublicBriefView from './views/PublicBrief'
@@ -33,6 +34,10 @@ function App() {
     return <PublicBriefView token={publicTokenFromPath(path)} />
   }
 
+  if (path === '/') {
+    return <HomeView onNavigate={navigate} />
+  }
+
   if (path === '/login' || (!isAuthenticated && path !== '/register')) {
     return <AuthView mode="login" onNavigate={navigate} />
   }
@@ -47,7 +52,6 @@ function App() {
     }
 
     switch (path) {
-      case '/':
       case '/dashboard':
         return <DashboardView onNavigate={navigate} />
       case '/intake/new':
