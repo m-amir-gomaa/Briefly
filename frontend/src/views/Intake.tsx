@@ -1,17 +1,20 @@
-import { useState, useRef, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { DragEvent } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Send,
+  AlertCircle,
+  CheckCircle2,
+  FileAudio,
+  FilePlus2,
+  FileText,
+  Image,
+  Loader2,
   Mic,
   MicOff,
-  Image,
+  RefreshCw,
+  Send,
   Upload,
   X,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  Sparkles,
 } from 'lucide-react'
 import { useIntakeStore } from '../store/useIntakeStore'
 
@@ -19,15 +22,31 @@ interface IntakeViewProps {
   onNavigate: (path: string) => void
 }
 
+function formatBytes(size: number) {
+  if (!size) return '0 KB'
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export default function IntakeView({ onNavigate }: IntakeViewProps) {
   const {
-    rawText, setRawText,
-    hasAudio, hasImage,
-    status, currentIntakeId,
-    submitIntake, reset,
+    rawText,
+    hasAudio,
+    hasImage,
+    status,
+    currentIntakeId,
+    currentIntake,
+    errorMessage,
+    eventMessage,
+    setRawText,
+    setHasAudio,
+    setHasImage,
+    submitIntake,
+    reset,
   } = useIntakeStore()
 
   const [isRecording, setIsRecording] = useState(false)
+  const [recordingError, setRecordingError] = useState<string | null>(null)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -35,295 +54,407 @@ export default function IntakeView({ onNavigate }: IntakeViewProps) {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
-  // ── Audio Recording ──────────────────────────────────────
-  const toggleRecording = async () => {
-    if (isRecording) {
-      mediaRecorderRef.current?.stop()
-      setIsRecording(false)
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop())
+      if (imagePreview) URL.revokeObjectURL(imagePreview)
+    }
+  }, [imagePreview])
+
+  const canSubmit = useMemo(
+    () => Boolean((rawText.trim() || audioBlob || imageFile) && status === 'IDLE'),
+    [audioBlob, imageFile, rawText, status],
+  )
+
+  const isBusy = status === 'UPLOADING' || status === 'PROCESSING'
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop()
+    setIsRecording(false)
+  }
+
+  const startRecording = async () => {
+    setRecordingError(null)
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setRecordingError('Audio recording is not available in this browser.')
       return
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
+      streamRef.current = stream
       audioChunksRef.current = []
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      const mediaRecorder = new MediaRecorder(stream)
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data)
       }
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
         setAudioBlob(blob)
-        useIntakeStore.setState({ hasAudio: true })
-        stream.getTracks().forEach((t) => t.stop())
+        setHasAudio(true)
+        stream.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
       }
 
       mediaRecorderRef.current = mediaRecorder
       mediaRecorder.start()
       setIsRecording(true)
-    } catch (err) {
-      console.error('Microphone access denied:', err)
+    } catch {
+      setRecordingError('Microphone permission was not granted.')
     }
   }
 
-  const removeAudio = () => {
-    setAudioBlob(null)
-    useIntakeStore.setState({ hasAudio: false })
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording()
+      return
+    }
+
+    void startRecording()
   }
 
-  // ── Image Handling ───────────────────────────────────────
-  const handleImageSelect = useCallback((file: File) => {
+  const selectAudioFile = (file: File) => {
+    setAudioBlob(file)
+    setHasAudio(true)
+    setRecordingError(null)
+  }
+
+  const removeAudio = () => {
+    if (isRecording) stopRecording()
+    setAudioBlob(null)
+    setHasAudio(false)
+  }
+
+  const selectImageFile = (file: File) => {
     if (!file.type.startsWith('image/')) return
+
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
     setImageFile(file)
-    useIntakeStore.setState({ hasImage: true })
-    const reader = new FileReader()
-    reader.onload = (e) => setImagePreview(e.target?.result as string)
-    reader.readAsDataURL(file)
-  }, [])
+    setImagePreview(URL.createObjectURL(file))
+    setHasImage(true)
+  }
 
   const removeImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
     setImageFile(null)
     setImagePreview(null)
-    useIntakeStore.setState({ hasImage: false })
+    setHasImage(false)
   }
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
     setDragOver(false)
-    const file = e.dataTransfer.files[0]
-    if (file) handleImageSelect(file)
+    const file = event.dataTransfer.files[0]
+    if (file) selectImageFile(file)
   }
 
-  // ── Submit ───────────────────────────────────────────────
   const handleSubmit = async () => {
     await submitIntake(audioBlob, imageFile)
   }
 
   const handleReset = () => {
     reset()
-    setAudioBlob(null)
-    setImageFile(null)
-    setImagePreview(null)
-    setIsRecording(false)
+    removeAudio()
+    removeImage()
+    setRecordingError(null)
   }
 
-  const canSubmit = (rawText.trim() || hasAudio || hasImage) && status === 'IDLE'
-
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-surface-50">New Intake</h1>
-        <p className="text-surface-400 mt-1">
-          Paste text, record audio, or drop an image — we'll turn it into a structured brief.
-        </p>
-      </div>
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-brand-700">
+              New intake
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-normal text-ink-950 sm:text-4xl">
+              Capture the raw client signal
+            </h1>
+          </div>
 
-      {/* Status Banner */}
-      <AnimatePresence>
-        {status !== 'IDLE' && (
-          <motion.div
-            initial={{ opacity: 0, y: -10, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: -10, height: 0 }}
-            className="overflow-hidden"
+          <button
+            type="button"
+            onClick={() => onNavigate('/')}
+            className="flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:border-ink-400 hover:text-ink-950"
           >
-            <div className={`rounded-2xl p-5 flex items-center gap-4 ${
-              status === 'UPLOADING' || status === 'PROCESSING'
-                ? 'glass border-brand-500/20'
-                : status === 'COMPLETED'
-                  ? 'glass border-success-400/20'
-                  : 'glass border-danger-400/20'
-            }`}>
-              {(status === 'UPLOADING' || status === 'PROCESSING') && (
-                <Loader2 className="w-6 h-6 text-brand-400 animate-spin shrink-0" />
-              )}
-              {status === 'COMPLETED' && (
-                <CheckCircle2 className="w-6 h-6 text-success-400 shrink-0" />
-              )}
-              {status === 'ERROR' && (
-                <AlertCircle className="w-6 h-6 text-danger-400 shrink-0" />
-              )}
+            <RefreshCw className="h-4 w-4" />
+            Dashboard
+          </button>
+        </div>
 
-              <div className="flex-1">
-                <p className="font-semibold text-surface-100">
-                  {status === 'UPLOADING' && 'Submitting intake...'}
-                  {status === 'PROCESSING' && 'AI is analyzing your intake...'}
-                  {status === 'COMPLETED' && 'Brief generated successfully!'}
-                  {status === 'ERROR' && 'Something went wrong.'}
-                </p>
-                {currentIntakeId && (
-                  <p className="text-xs text-surface-400 mt-1 font-mono">
-                    ID: {currentIntakeId}
-                  </p>
+        <AnimatePresence>
+          {status !== 'IDLE' && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className={`rounded-lg border p-4 shadow-sm ${
+                status === 'ERROR'
+                  ? 'border-red-100 bg-red-100 text-red-600'
+                  : status === 'COMPLETED'
+                    ? 'border-teal-100 bg-teal-100 text-teal-600'
+                    : 'border-brand-100 bg-brand-100 text-brand-700'
+              }`}
+            >
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  {isBusy && <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin" />}
+                  {status === 'COMPLETED' && <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />}
+                  {status === 'ERROR' && <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />}
+                  <div>
+                    <p className="text-sm font-semibold">
+                      {status === 'UPLOADING' && 'Submitting intake'}
+                      {status === 'PROCESSING' && 'Processing intake'}
+                      {status === 'COMPLETED' && 'Brief generated'}
+                      {status === 'ERROR' && 'Intake failed'}
+                    </p>
+                    <p className="mt-1 text-sm opacity-80">
+                      {status === 'ERROR'
+                        ? errorMessage || 'The backend returned an error.'
+                        : eventMessage || 'Waiting for the worker event stream.'}
+                    </p>
+                    {currentIntakeId && (
+                      <p className="mt-2 font-mono text-xs opacity-70">{currentIntakeId}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {currentIntakeId && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate(`/intake/${currentIntakeId}`)}
+                      className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-xs font-semibold text-ink-950 shadow-sm"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      Open Intake
+                    </button>
+                  )}
+                  {(status === 'COMPLETED' || status === 'ERROR') && (
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      className="flex items-center gap-2 rounded-lg bg-ink-950 px-3 py-2 text-xs font-semibold text-white"
+                    >
+                      <FilePlus2 className="h-3.5 w-3.5" />
+                      New Intake
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="rounded-lg border border-line bg-surface p-4 shadow-sm sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <label htmlFor="intake-text-input" className="flex items-center gap-2 text-sm font-semibold text-ink-950">
+              <FileText className="h-4 w-4 text-brand-700" />
+              Text notes
+            </label>
+            <span className="font-mono text-xs text-ink-500">{rawText.length} chars</span>
+          </div>
+
+          <textarea
+            id="intake-text-input"
+            value={rawText}
+            onChange={(event) => setRawText(event.target.value)}
+            placeholder="Paste client notes, transcripts, emails, or requirements..."
+            rows={13}
+            disabled={status !== 'IDLE'}
+            className="min-h-[300px] w-full resize-y rounded-lg border border-line bg-canvas px-4 py-3 text-sm leading-6 text-ink-950 outline-none transition placeholder:text-ink-400 focus:border-brand-600 focus:bg-surface focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:opacity-70"
+          />
+        </div>
+      </section>
+
+      <aside className="space-y-4">
+        <div className="rounded-lg border border-line bg-surface p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-ink-950">Attachments</h2>
+          <p className="mt-1 text-sm text-ink-500">Voice memo and whiteboard capture are optional.</p>
+
+          <div className="mt-4 space-y-3">
+            <div className="rounded-lg border border-line bg-canvas p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <FileAudio className="h-4 w-4 text-ink-700" />
+                  <span className="text-sm font-semibold text-ink-950">Audio</span>
+                </div>
+                {hasAudio && (
+                  <button
+                    type="button"
+                    onClick={removeAudio}
+                    className="rounded-lg p-1.5 text-ink-500 transition hover:bg-surface hover:text-ink-950"
+                    aria-label="Remove audio"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 )}
               </div>
 
-              {status === 'COMPLETED' && (
-                <button
-                  onClick={() => onNavigate('/')}
-                  className="px-4 py-2 rounded-xl bg-success-400/10 text-success-400 text-sm font-medium hover:bg-success-400/20 transition-colors cursor-pointer"
-                >
-                  View Dashboard
-                </button>
-              )}
-
-              {(status === 'COMPLETED' || status === 'ERROR') && (
-                <button
-                  onClick={handleReset}
-                  className="px-4 py-2 rounded-xl bg-surface-800 text-surface-300 text-sm font-medium hover:bg-surface-700 transition-colors cursor-pointer"
-                >
-                  New Intake
-                </button>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Text Input */}
-      <div className="glass rounded-2xl p-6 space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <FileText className="w-5 h-5 text-brand-400" />
-          <h2 className="text-lg font-semibold text-surface-100">Text Input</h2>
-        </div>
-
-        <textarea
-          value={rawText}
-          onChange={(e) => setRawText(e.target.value)}
-          placeholder="Paste client notes, meeting transcripts, project requirements, or any freeform text here..."
-          rows={8}
-          className="w-full bg-surface-900/50 border border-surface-700/50 rounded-xl p-4 text-surface-100 placeholder-surface-500 focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 resize-none transition-all text-sm leading-relaxed"
-          disabled={status !== 'IDLE'}
-          id="intake-text-input"
-        />
-
-        <div className="flex items-center justify-between text-xs text-surface-500">
-          <span>{rawText.length} characters</span>
-          <span>Supports any format: notes, emails, chat logs, etc.</span>
-        </div>
-      </div>
-
-      {/* Audio + Image Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Audio Recorder */}
-        <div className="glass rounded-2xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Mic className="w-5 h-5 text-accent-400" />
-            <h2 className="text-lg font-semibold text-surface-100">Audio</h2>
-          </div>
-
-          {!audioBlob ? (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={toggleRecording}
-              disabled={status !== 'IDLE'}
-              className={`w-full py-12 rounded-xl border-2 border-dashed transition-all flex flex-col items-center gap-3 cursor-pointer ${
-                isRecording
-                  ? 'border-danger-400/50 bg-danger-400/5'
-                  : 'border-surface-700/50 hover:border-accent-400/30 hover:bg-accent-400/5'
-              }`}
-              id="audio-record-btn"
-            >
-              {isRecording ? (
-                <>
-                  <div className="relative">
-                    <MicOff className="w-8 h-8 text-danger-400" />
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-danger-400 rounded-full animate-pulse-soft" />
-                  </div>
-                  <span className="text-sm text-danger-400 font-medium">Recording... Click to stop</span>
-                </>
+              {audioBlob ? (
+                <div className="mt-3 rounded-lg bg-surface px-3 py-2 text-sm text-ink-600">
+                  <span className="font-semibold text-ink-950">Attached</span>
+                  <span className="ml-2 text-xs text-ink-500">{formatBytes(audioBlob.size)}</span>
+                </div>
               ) : (
-                <>
-                  <Mic className="w-8 h-8 text-surface-400" />
-                  <span className="text-sm text-surface-400">Click to record audio</span>
-                </>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleRecording}
+                    disabled={status !== 'IDLE'}
+                    className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+                      isRecording
+                        ? 'bg-red-100 text-red-600'
+                        : 'border border-line bg-surface text-ink-700 hover:border-ink-400'
+                    }`}
+                  >
+                    {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                    {isRecording ? 'Stop' : 'Record'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => audioInputRef.current?.click()}
+                    disabled={status !== 'IDLE'}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-ink-700 transition hover:border-ink-400"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload
+                  </button>
+                </div>
               )}
-            </motion.button>
-          ) : (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-accent-400/5 border border-accent-400/20">
-              <Mic className="w-5 h-5 text-accent-400" />
-              <span className="text-sm text-surface-200 flex-1">Audio recorded</span>
-              <button
-                onClick={removeAudio}
-                className="p-1.5 rounded-lg hover:bg-surface-800 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4 text-surface-400" />
-              </button>
+
+              <input
+                ref={audioInputRef}
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) selectAudioFile(file)
+                }}
+              />
+
+              {recordingError && (
+                <p className="mt-2 text-xs font-medium text-red-600">{recordingError}</p>
+              )}
             </div>
-          )}
+
+            <div className="rounded-lg border border-line bg-canvas p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Image className="h-4 w-4 text-ink-700" />
+                  <span className="text-sm font-semibold text-ink-950">Image</span>
+                </div>
+                {hasImage && (
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="rounded-lg p-1.5 text-ink-500 transition hover:bg-surface hover:text-ink-950"
+                    aria-label="Remove image"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {imagePreview && imageFile ? (
+                <div className="mt-3 overflow-hidden rounded-lg border border-line bg-surface">
+                  <img src={imagePreview} alt="" className="h-36 w-full object-cover" />
+                  <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs text-ink-500">
+                    <span className="truncate">{imageFile.name}</span>
+                    <span className="shrink-0">{formatBytes(imageFile.size)}</span>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    setDragOver(true)
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => imageInputRef.current?.click()}
+                  className={`mt-3 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-4 py-6 text-center transition ${
+                    dragOver
+                      ? 'border-brand-600 bg-brand-100 text-brand-700'
+                      : 'border-line bg-surface text-ink-500 hover:border-ink-400 hover:text-ink-800'
+                  }`}
+                >
+                  <Upload className="h-5 w-5" />
+                  <p className="mt-2 text-sm font-semibold">Drop image</p>
+                  <p className="mt-1 text-xs">PNG, JPG, or WebP</p>
+                </div>
+              )}
+
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) selectImageFile(file)
+                }}
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Image Drop Zone */}
-        <div className="glass rounded-2xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Image className="w-5 h-5 text-success-400" />
-            <h2 className="text-lg font-semibold text-surface-100">Image</h2>
+        <div className="rounded-lg border border-line bg-surface p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-ink-950">Submission</h2>
+          <div className="mt-4 space-y-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-ink-500">Text</span>
+              <span className="font-semibold text-ink-950">{rawText.trim() ? 'Ready' : 'Empty'}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-ink-500">Audio</span>
+              <span className="font-semibold text-ink-950">{audioBlob ? 'Attached' : 'None'}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-ink-500">Image</span>
+              <span className="font-semibold text-ink-950">{imageFile ? 'Attached' : 'None'}</span>
+            </div>
           </div>
 
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) handleImageSelect(file)
-            }}
-          />
+          {isBusy && (
+            <div className="relative mt-5 h-2 overflow-hidden rounded-full bg-brand-100 progress-stripe" />
+          )}
 
-          {!imagePreview ? (
-            <motion.div
-              whileHover={{ scale: 1.01 }}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`w-full py-12 rounded-xl border-2 border-dashed transition-all flex flex-col items-center gap-3 cursor-pointer ${
-                dragOver
-                  ? 'border-success-400/50 bg-success-400/5'
-                  : 'border-surface-700/50 hover:border-success-400/30 hover:bg-success-400/5'
-              }`}
-              id="image-drop-zone"
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className={`mt-5 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition ${
+              canSubmit
+                ? 'bg-ink-950 text-white shadow-sm hover:bg-ink-800'
+                : 'bg-surface-muted text-ink-400'
+            }`}
+          >
+            {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Generate Brief
+          </button>
+
+          {currentIntake?.brief?.share_token && (
+            <button
+              type="button"
+              onClick={() => onNavigate(`/public/brief/${currentIntake.brief?.share_token}`)}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-surface px-4 py-3 text-sm font-semibold text-ink-700 transition hover:border-ink-400"
             >
-              <Upload className="w-8 h-8 text-surface-400" />
-              <span className="text-sm text-surface-400">Drop image or click to browse</span>
-            </motion.div>
-          ) : (
-            <div className="relative rounded-xl overflow-hidden">
-              <img src={imagePreview} alt="Preview" className="w-full h-32 object-cover rounded-xl" />
-              <button
-                onClick={removeImage}
-                className="absolute top-2 right-2 p-1.5 rounded-lg bg-surface-900/80 hover:bg-surface-800 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4 text-surface-300" />
-              </button>
-            </div>
+              <CheckCircle2 className="h-4 w-4" />
+              Public Brief
+            </button>
           )}
         </div>
-      </div>
-
-      {/* Submit Button */}
-      <motion.button
-        whileHover={canSubmit ? { scale: 1.01 } : {}}
-        whileTap={canSubmit ? { scale: 0.99 } : {}}
-        onClick={handleSubmit}
-        disabled={!canSubmit}
-        className={`w-full py-4 rounded-2xl font-semibold text-lg flex items-center justify-center gap-3 transition-all cursor-pointer ${
-          canSubmit
-            ? 'gradient-brand text-white shadow-xl shadow-brand-500/20 hover:shadow-brand-500/30'
-            : 'bg-surface-800 text-surface-500 cursor-not-allowed'
-        }`}
-        id="submit-intake-btn"
-      >
-        <Sparkles className="w-5 h-5" />
-        Generate Brief
-        <Send className="w-5 h-5" />
-      </motion.button>
+      </aside>
     </div>
   )
 }
