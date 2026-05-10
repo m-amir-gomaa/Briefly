@@ -69,10 +69,10 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
     let message = response.statusText || 'Request failed'
 
     try {
-      const errorBody = await response.json()
-      message = errorBody.error || message
+      const body = await response.json()
+      message = body.error || message
     } catch {
-      // Keep the HTTP status text when the backend does not return JSON.
+      // Keep the status text when the backend does not return JSON.
     }
 
     throw new Error(message)

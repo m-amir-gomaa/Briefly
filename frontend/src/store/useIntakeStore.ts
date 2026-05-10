@@ -3,7 +3,7 @@ import {
   getIntake,
   submitIntake as submitIntakeRequest,
   type IntakeRecord,
-} from '../lib/api'
+} from '../services/api'
 
 type IntakeFlowStatus = 'IDLE' | 'UPLOADING' | 'PROCESSING' | 'COMPLETED' | 'ERROR'
 type DashboardStatus = 'IDLE' | 'LOADING' | 'READY' | 'ERROR'

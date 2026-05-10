@@ -1,59 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
 import {
-  AlertCircle,
   ArrowRight,
   CheckCircle2,
-  ClipboardCheck,
-  Clock3,
+  ClipboardList,
   Copy,
   FilePlus2,
-  FileText,
-  Image,
   Loader2,
-  Mic,
   RefreshCw,
-  Zap,
 } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import Button from '../components/ui/Button'
+import Card from '../components/ui/Card'
+import StatusBadge from '../components/shared/StatusBadge'
 import { useIntakeStore } from '../store/useIntakeStore'
-import type { BackendIntakeStatus, IntakeRecord, IntakeType } from '../lib/api'
+import type { IntakeRecord } from '../services/api'
 
 interface DashboardProps {
   onNavigate: (path: string) => void
-}
-
-const statusConfig: Record<
-  BackendIntakeStatus,
-  { icon: LucideIcon; label: string; className: string }
-> = {
-  PENDING: {
-    icon: Clock3,
-    label: 'Queued',
-    className: 'bg-amber-100 text-amber-600',
-  },
-  PROCESSING: {
-    icon: Loader2,
-    label: 'Processing',
-    className: 'bg-brand-100 text-brand-700',
-  },
-  COMPLETED: {
-    icon: CheckCircle2,
-    label: 'Complete',
-    className: 'bg-teal-100 text-teal-600',
-  },
-  FAILED: {
-    icon: AlertCircle,
-    label: 'Failed',
-    className: 'bg-red-100 text-red-600',
-  },
-}
-
-const typeIcons: Record<IntakeType, LucideIcon> = {
-  TEXT: FileText,
-  VOICE: Mic,
-  IMAGE: Image,
-  MULTI: Zap,
 }
 
 function formatDate(value: string) {
@@ -67,234 +29,176 @@ function formatDate(value: string) {
   }).format(new Date(value))
 }
 
-function summarize(record: IntakeRecord) {
+function getTitle(record: IntakeRecord) {
   if (record.brief?.summary) return record.brief.summary
-  if (record.raw_text?.trim()) return record.raw_text.trim()
-  if (record.type === 'VOICE') return 'Audio intake'
-  if (record.type === 'IMAGE') return 'Image intake'
-  return 'Multimodal intake'
+  if (record.raw_text.trim()) return record.raw_text.trim()
+  return `${record.type} intake`
 }
 
 export default function DashboardView({ onNavigate }: DashboardProps) {
-  const {
-    intakes,
-    dashboardStatus,
-    refreshTrackedIntakes,
-    errorMessage,
-  } = useIntakeStore()
+  const { intakes, dashboardStatus, refreshTrackedIntakes } = useIntakeStore()
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   useEffect(() => {
     void refreshTrackedIntakes()
   }, [refreshTrackedIntakes])
 
-  const metrics = useMemo(() => {
-    const completed = intakes.filter((record) => record.status === 'COMPLETED').length
-    const inFlight = intakes.filter((record) =>
-      record.status === 'PENDING' || record.status === 'PROCESSING'
-    ).length
-    const confirmed = intakes.filter((record) => record.brief?.is_confirmed).length
-    const averageConfidence = intakes.length
-      ? Math.round(
-          (intakes.reduce((sum, record) => sum + (record.brief?.confidence_score || 0), 0)
-            / Math.max(completed, 1))
-            * 100,
-        )
-      : 0
+  const stats = useMemo(() => {
+    const completed = intakes.filter((intake) => intake.status === 'COMPLETED').length
+    const processing = intakes.filter((intake) => intake.status === 'PENDING' || intake.status === 'PROCESSING').length
+    const approved = intakes.filter((intake) => intake.brief?.is_confirmed).length
 
-    return { completed, inFlight, confirmed, averageConfidence }
+    return { completed, processing, approved }
   }, [intakes])
 
   const copyPublicLink = async (record: IntakeRecord) => {
     if (!record.brief?.share_token) return
 
-    const url = `${window.location.origin}/public/brief/${record.brief.share_token}`
-    await navigator.clipboard.writeText(url)
+    await navigator.clipboard.writeText(`${window.location.origin}/public/${record.brief.share_token}`)
     setCopiedId(record.id)
     window.setTimeout(() => setCopiedId(null), 1600)
   }
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-brand-700">
-            Intake operations
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-ink-950 sm:text-4xl">
-            Project briefs, from intake to sign-off
+          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-500">Dashboard</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950 sm:text-4xl">
+            Brief pipeline
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-600">
-            Recent submissions from this browser are hydrated through the Go API and updated after the AI worker finishes.
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
+            Track intakes from raw input to client approval. This dashboard hydrates browser-tracked records from the backend.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
             onClick={() => void refreshTrackedIntakes()}
-            className="flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:border-ink-400 hover:text-ink-950"
+            icon={<RefreshCw className={`h-4 w-4 ${dashboardStatus === 'LOADING' ? 'animate-spin' : ''}`} />}
           >
-            <RefreshCw className={`h-4 w-4 ${dashboardStatus === 'LOADING' ? 'animate-spin' : ''}`} />
             Refresh
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('/intake/new')}
-            className="flex items-center gap-2 rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-ink-800"
-          >
-            <FilePlus2 className="h-4 w-4" />
+          </Button>
+          <Button onClick={() => onNavigate('/intake/new')} icon={<FilePlus2 className="h-4 w-4" />}>
             New Intake
-          </button>
+          </Button>
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 md:grid-cols-3">
         {[
-          { label: 'Tracked', value: intakes.length, helper: 'Local history', icon: ClipboardCheck },
-          { label: 'Complete', value: metrics.completed, helper: 'Ready briefs', icon: CheckCircle2 },
-          { label: 'In flight', value: metrics.inFlight, helper: 'Queued or processing', icon: Clock3 },
-          {
-            label: 'Avg confidence',
-            value: metrics.averageConfidence ? `${metrics.averageConfidence}%` : '0%',
-            helper: `${metrics.confirmed} confirmed`,
-            icon: Zap,
-          },
-        ].map((stat, index) => {
+          { label: 'Completed briefs', value: stats.completed, icon: CheckCircle2 },
+          { label: 'Processing now', value: stats.processing, icon: Loader2 },
+          { label: 'Client approvals', value: stats.approved, icon: ClipboardList },
+        ].map((stat) => {
           const Icon = stat.icon
 
           return (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.04 }}
-              className="rounded-lg border border-line bg-surface p-4 shadow-sm"
-            >
+            <Card key={stat.label}>
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-ink-600">{stat.label}</p>
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-muted text-ink-700">
-                  <Icon className="h-4 w-4" />
+                <div>
+                  <p className="text-sm font-medium text-zinc-500">{stat.label}</p>
+                  <p className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950">{stat.value}</p>
+                </div>
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
+                  <Icon className="h-5 w-5" />
                 </span>
               </div>
-              <p className="mt-3 text-3xl font-semibold tracking-normal text-ink-950">{stat.value}</p>
-              <p className="mt-1 text-xs font-medium text-ink-500">{stat.helper}</p>
-            </motion.div>
+            </Card>
           )
         })}
       </section>
 
-      <section className="rounded-lg border border-line bg-surface shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:justify-between">
+      <Card padded={false} className="overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-zinc-200 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-ink-950">Recent intakes</h2>
-            <p className="text-sm text-ink-500">Open an intake to review the generated brief and public link.</p>
+            <h2 className="text-base font-semibold text-zinc-950">Past intakes</h2>
+            <p className="text-sm text-zinc-500">Clean table view with backend status and share links.</p>
           </div>
           {dashboardStatus === 'LOADING' && (
-            <span className="flex items-center gap-2 rounded-lg bg-brand-100 px-3 py-1.5 text-xs font-semibold text-brand-700">
+            <span className="inline-flex items-center gap-2 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Syncing
             </span>
           )}
         </div>
 
-        {errorMessage && dashboardStatus === 'ERROR' && (
-          <div className="border-b border-line bg-red-100 px-4 py-3 text-sm font-medium text-red-600">
-            {errorMessage}
-          </div>
-        )}
-
         {!intakes.length && dashboardStatus !== 'LOADING' ? (
-          <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-100 text-brand-700">
-              <FilePlus2 className="h-5 w-5" />
+          <div className="flex flex-col items-center justify-center px-5 py-16 text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
+              <ClipboardList className="h-6 w-6" />
             </span>
-            <h3 className="mt-4 text-lg font-semibold text-ink-950">No intakes yet</h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-ink-600">
-              Submit the first intake to create a structured brief and start local tracking.
+            <h3 className="mt-5 text-xl font-semibold text-zinc-950">No intakes yet</h3>
+            <p className="mt-2 max-w-md text-sm leading-6 text-zinc-600">
+              Start with your first client notes, voice memo, or whiteboard screenshot and Briefly will build the structured document.
             </p>
-            <button
-              type="button"
+            <Button
+              className="mt-6"
               onClick={() => onNavigate('/intake/new')}
-              className="mt-5 flex items-center gap-2 rounded-lg bg-ink-950 px-4 py-2.5 text-sm font-semibold text-white"
+              icon={<FilePlus2 className="h-4 w-4" />}
             >
-              <FilePlus2 className="h-4 w-4" />
-              New Intake
-            </button>
+              Create your first brief
+            </Button>
           </div>
         ) : (
-          <div className="divide-y divide-line">
-            {intakes.map((record, index) => {
-              const status = statusConfig[record.status]
-              const StatusIcon = status.icon
-              const TypeIcon = typeIcons[record.type]
-              const isWorking = record.status === 'PROCESSING'
-              const canCopy = Boolean(record.brief?.share_token)
-
-              return (
-                <motion.div
-                  key={record.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.03 }}
-                  className="grid gap-4 p-4 transition hover:bg-surface-muted/70 lg:grid-cols-[minmax(0,1fr)_auto_auto]"
-                >
-                  <button
-                    type="button"
-                    onClick={() => onNavigate(`/intake/${record.id}`)}
-                    className="flex min-w-0 items-start gap-3 text-left"
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-ink-700">
-                      <TypeIcon className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-ink-950">
-                        {summarize(record)}
-                      </span>
-                      <span className="mt-1 block text-xs font-medium text-ink-500">
-                        {record.type} intake - {formatDate(record.created_at)}
-                      </span>
-                    </span>
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <span className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${status.className}`}>
-                      <StatusIcon className={`h-3.5 w-3.5 ${isWorking ? 'animate-spin' : ''}`} />
-                      {status.label}
-                    </span>
-                    {record.brief && (
-                      <span className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink-600">
-                        {Math.round(record.brief.confidence_score * 100)}%
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 lg:justify-end">
-                    {canCopy && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-zinc-200 text-left text-sm">
+              <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                <tr>
+                  <th className="px-5 py-3">Brief</th>
+                  <th className="px-5 py-3">Type</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">Created</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 bg-white">
+                {intakes.map((record) => (
+                  <tr key={record.id} className="transition-all duration-200 ease-in-out hover:bg-zinc-50">
+                    <td className="max-w-xl px-5 py-4">
                       <button
                         type="button"
-                        onClick={() => void copyPublicLink(record)}
-                        className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-600 transition hover:border-ink-400 hover:text-ink-950"
+                        onClick={() => onNavigate(`/intake/${record.id}`)}
+                        className="block max-w-full text-left"
                       >
-                        <Copy className="h-3.5 w-3.5" />
-                        {copiedId === record.id ? 'Copied' : 'Public link'}
+                        <span className="block truncate font-semibold text-zinc-950">{getTitle(record)}</span>
+                        <span className="mt-1 block truncate font-mono text-xs text-zinc-500">{record.id}</span>
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => onNavigate(`/intake/${record.id}`)}
-                      className="flex items-center gap-2 rounded-lg bg-ink-950 px-3 py-2 text-xs font-semibold text-white transition hover:bg-ink-800"
-                    >
-                      Open
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </motion.div>
-              )
-            })}
+                    </td>
+                    <td className="px-5 py-4 font-semibold text-zinc-700">{record.type}</td>
+                    <td className="px-5 py-4">
+                      <StatusBadge status={record.status} />
+                    </td>
+                    <td className="px-5 py-4 text-zinc-600">{formatDate(record.created_at)}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        {record.brief?.share_token && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => void copyPublicLink(record)}
+                            icon={<Copy className="h-3.5 w-3.5" />}
+                          >
+                            {copiedId === record.id ? 'Copied' : 'Link'}
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          onClick={() => onNavigate(`/intake/${record.id}`)}
+                          icon={<ArrowRight className="h-3.5 w-3.5" />}
+                        >
+                          Open
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-      </section>
+      </Card>
     </div>
   )
 }
