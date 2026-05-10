@@ -1,3 +1,12 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
 # Dependencies
 node_modules/
 __pycache__/
@@ -8,18 +17,26 @@ venv/
 
 # Build output
 dist/
+dist-ssr
 build/
 
 # Environment
 .env
 .env.local
 .env.*.local
+*.local
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
+*.sw?
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 
 # OS
 .DS_Store
@@ -30,7 +47,3 @@ docker-compose.override.yml
 
 # Go
 /backend/tmp/
-
-# Frontend
-/frontend/node_modules/
-/frontend/dist/
