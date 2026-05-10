@@ -1,43 +1,27 @@
-# AI Service Cookbook
+# Briefly AI Cookbook: Python/LangGraph
 
-## Overview
-The AI Worker is a Python FastAPI service that consumes intake jobs from Redis and processes them through a LangGraph pipeline using Google Gemini 1.5 Flash.
+## Role Summary
+You are building the heavy computational engine. You receive jobs from Redis, run them through an LLM state machine, and update the Go API.
+**Tech Stack**: Python 3.11, FastAPI (for worker process), LangGraph, Google Gemini 1.5 Flash.
 
-## Setup
+## 1. The Queue & Idempotency
+You run a persistent `while True` loop calling `redis_client.brpop("intake:queue", timeout=0)`.
+*   **Idempotency Check**: Before spending tokens on Gemini, you MUST do an HTTP GET to the Go API to check if the `intake_id` is already `COMPLETED`. If it is, drop the job. 
 
-```bash
-cd ai_service
-python -m venv venv
-venv\Scripts\activate   # Windows
-pip install -r requirements.txt
-```
+## 2. The LangGraph State Machine
+We use a **Fan-Out/Fan-In** architecture.
+*   `node_transcribe` (Audio) and `node_vision` (Image OCR) must run in parallel using `asyncio.gather()`. 
+*   **State Isolation**: The `ShipmentState` TypedDict must be instantiated locally inside the queue loop. NEVER use global variables.
+*   **Semantic Caching**: Before sending large extraction prompts to Gemini, embed the prompt. Query `pgvector` using Cosine Similarity. If a match > 99% exists, return the cached result immediately to save time and API costs.
+*   **Long-Term Memory (RAG)**: For project management queries, use `pgvector` to pull historical brief context into the Gemini prompt.
 
-## Environment Variables
-```
-REDIS_URL=redis://localhost:6379/0
-API_URL=http://localhost:8080
-GOOGLE_API_KEY=your_key_here
-```
+## 3. Resilience & Security
+*   **Circuit Breaker**: If Gemini returns 3 consecutive `429` errors, you must automatically route the LLM call to the local Ollama instance (`http://localhost:11434`).
+*   **Prompt Sandboxing**: All outputs must be wrapped in `PydanticOutputParser`. If a user attempts a prompt injection ("Ignore previous instructions"), the parser will fail, and you must catch the `ValidationError` and flag the intake as `FAILED`.
 
-## Running Locally
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8001 --reload
-```
+## 4. How to Build Using an AI Agent
+When you want an AI to write a LangGraph node, paste this exact prompt:
+> *"Write the `node_analyze` function for our LangGraph state machine. Follow the Briefly AI Cookbook: Use Langchain's Google Gemini integration. The prompt must extract goals from the `state['unified_context']`. Output MUST be parsed using a PydanticOutputParser to prevent prompt injection. Return the updated state."*
 
-## Pipeline Nodes
-
-| Node | Purpose | LLM Call |
-|------|---------|----------|
-| `node_ingest` | Initialize state | No |
-| `node_transcribe` | Audio → text via Gemini | Yes |
-| `node_vision` | Image → text via Gemini | Yes |
-| `node_merge` | Combine all text sources | No |
-| `node_analyze` | Extract goals, criteria | Yes |
-| `node_ambiguity` | Find gaps & questions | Yes |
-| `node_tone` | Detect communication tone | Yes |
-| `node_finalize` | PATCH results + publish event | No |
-
-## Troubleshooting
-- **No API key**: Pipeline will use fallback/placeholder responses
-- **Redis connection**: Ensure Redis is running on the configured URL
-- **Pipeline errors**: Check `briefly.orchestrator` logger output
+## 5. Review & Ship
+Test the node logic in isolation using a local Jupyter notebook. Ensure the node takes less than 3 seconds to execute. If it passes, add it to `orchestrator.py`.

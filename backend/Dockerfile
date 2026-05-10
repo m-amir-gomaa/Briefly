@@ -1,24 +1,25 @@
-# ── Build stage ──────────────────────────────────────────────
 FROM golang:1.22-alpine AS builder
-
-RUN apk add --no-cache git
 
 WORKDIR /app
 
+# Copy go mod and sum files
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Copy source code
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /briefly-api ./cmd/api
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/api/main.go
 
-# ── Runtime stage ────────────────────────────────────────────
-FROM alpine:3.19
+# Start a new stage from scratch
+FROM alpine:latest  
 
-RUN apk add --no-cache ca-certificates tzdata
+WORKDIR /root/
 
-COPY --from=builder /briefly-api /usr/local/bin/briefly-api
+# Copy the Pre-built binary file from the previous stage
+COPY --from=builder /app/main .
 
 EXPOSE 8080
 
-CMD ["briefly-api"]
+CMD ["./main"]

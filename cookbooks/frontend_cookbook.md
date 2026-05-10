@@ -1,53 +1,33 @@
-# Frontend Cookbook
+# Briefly Frontend Cookbook: React/Next.js
 
-## Overview
-React 19 + TypeScript SPA with Vite, Tailwind CSS v4, Zustand, and Framer Motion.
+## Role Summary
+You are building the UI/UX that the judges and clients will actually see. The architecture has already been scaffolded in `frontend/`. 
+**Tech Stack**: Next.js (App Router), React, Tailwind CSS, Zustand, Lucide React.
 
-## Setup
-```bash
-cd frontend
-npm install
+## 1. Visual Targets
+You are to recreate the provided high-fidelity mockups using Tailwind CSS. 
+*   **Aesthetics**: Glassmorphism, deep dark mode (`bg-slate-950`), vibrant emerald/cyan accents.
+*   **Images**: Review the generated images in the workspace (`agency_dashboard_mockup`, `intake_dropzone_mockup`, `public_brief_mockup`).
+
+## 2. State Management & Auth (Zustand & JWT)
+Do NOT use Redux or `useState` for global logic. Use the pre-scaffolded Zustand stores in `src/store/`:
+*   `useAuthStore`: Manages the agency session. Auth is handled via HTTP-Only JWT cookies provided by the Go API. Do not store tokens in `localStorage`.
+*   `useIntakeStore`: Manages the drafted text, media toggles, and `status` ('IDLE' -> 'UPLOADING' -> 'PROCESSING').
+
+## 3. Real-Time Streaming (WebTransport / SSE)
+You will not use WebSockets. To receive real-time, zero-stutter updates from the AI pipeline, connect to the Go API using **WebTransport**. If WebTransport is unavailable, fallback to standard `EventSource` (SSE).
+```javascript
+// Example WebTransport connection
+const transport = new WebTransport(`/api/v1/events/${intakeId}`);
+await transport.ready;
+const reader = transport.datagrams.readable.getReader();
+// fallback
+// const eventSource = new EventSource(`/api/v1/events/${intakeId}`);
 ```
 
-## Running
-```bash
-npm run dev      # Dev server on port 5173
-npm run build    # Production build
-npm run preview  # Preview production build
-```
+## 4. How to Build Using an AI Agent
+When you want an AI (like Cursor or Gemini) to build a component for you, paste this exact prompt:
+> *"I need a React component using Tailwind CSS that matches the 'Intake Dropzone' mockup. Follow the Briefly Frontend Cookbook: Use `lucide-react` for icons. Do not use local component state for the text area; instead, bind it to `useIntakeStore().rawText`."*
 
-## Project Structure
-```
-frontend/src/
-├── main.tsx           # Entry point
-├── App.tsx            # Path-based router
-├── index.css          # Tailwind + design tokens
-├── components/
-│   └── Layout.tsx     # Sidebar + main content shell
-├── views/
-│   ├── Dashboard.tsx  # Intake list + stats
-│   ├── Intake.tsx     # New intake form
-│   └── PublicBrief.tsx # Client-facing brief
-└── store/
-    ├── useAuthStore.ts    # Auth (stub)
-    └── useIntakeStore.ts  # Intake + SSE
-```
-
-## Routes
-
-| Path | View |
-|------|------|
-| `/` | Dashboard |
-| `/intake/new` | New Intake Form |
-| `/public/brief/:token` | Public Brief (no layout) |
-
-## State Management
-- **Zustand** for global state (no Redux boilerplate)
-- `useIntakeStore`: manages form state, submission, and SSE events
-- `useAuthStore`: stub — auto-authenticated demo user
-
-## Design System
-- **Colors**: Custom surface/brand/accent palette in `index.css`
-- **Effects**: Glassmorphism (`.glass`), gradients, glow effects
-- **Animations**: Framer Motion page transitions, hover effects
-- **Fonts**: Inter (UI) + JetBrains Mono (code)
+## 5. Review & Ship
+Once the AI generates the component, verify that it is responsive and uses no more than 1 network request on mount. If it looks exactly like the mockup, commit and push.
