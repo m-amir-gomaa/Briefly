@@ -7,10 +7,15 @@ This guide provides the team with instructions on how to leverage the Nix packag
 Ensure you have **Nix** installed with **Flakes** enabled.
 
 ### Installation
-If you don't have Nix, use the [Determinate Systems installer](https://github.com/DeterminateSystems/nix-installer) (recommended):
-```bash
-curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
-```
+- **Linux**: Use the [Determinate Systems installer](https://github.com/DeterminateSystems/nix-installer) (recommended):
+  ```bash
+  curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+  ```
+- **Windows**: Nix is not natively supported on Windows. You **must** use **WSL2** (Windows Subsystem for Linux).
+  1. Install WSL2 (e.g., Ubuntu) from the Microsoft Store or via `wsl --install`.
+  2. Open your WSL terminal.
+  3. Install Nix inside the WSL environment using the Linux command above.
+  4. **Performance Tip**: Always clone the repository into the Linux filesystem (e.g., `~/projects/`) rather than the Windows mount (`/mnt/c/`) for significantly faster performance.
 
 ### Enabling Flakes
 If you used the official installer, add this to `~/.config/nix/nix.conf`:
