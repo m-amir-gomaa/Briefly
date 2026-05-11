@@ -1,17 +1,32 @@
 import { create } from 'zustand';
+import { getIntake, submitIntake as apiSubmitIntake, type IntakeRecord } from '../services/api';
 
 interface IntakeState {
+  // --- UI State ---
   rawText: string;
   hasAudio: boolean;
   hasImage: boolean;
   status: 'IDLE' | 'UPLOADING' | 'PROCESSING' | 'COMPLETED' | 'ERROR';
+  dashboardStatus: 'IDLE' | 'LOADING' | 'ERROR';
+  errorMessage: string | null;
+  eventMessage: string | null;
+  
+  // --- Data State ---
+  intakes: IntakeRecord[];
   currentIntakeId: string | null;
+  currentIntake: IntakeRecord | null;
+
+  // --- Actions ---
   setRawText: (text: string) => void;
+  setHasAudio: (val: boolean) => void;
+  setHasImage: (val: boolean) => void;
   setMediaStatus: (audio: boolean, image: boolean) => void;
   setStatus: (status: 'IDLE' | 'UPLOADING' | 'PROCESSING' | 'COMPLETED' | 'ERROR') => void;
   setIntakeId: (id: string | null) => void;
-  login: (email: string) => Promise<void>;
-  submitIntake: () => Promise<void>;
+  
+  refreshTrackedIntakes: () => Promise<void>;
+  fetchIntake: (id: string) => Promise<IntakeRecord | null>;
+  submitIntake: (audioBlob: Blob | null, imageFile: File | null) => Promise<void>;
   subscribeToEvents: (id: string) => void;
   reset: () => void;
 }
@@ -23,46 +38,77 @@ export const useIntakeStore = create<IntakeState>((set, get) => ({
   hasAudio: false,
   hasImage: false,
   status: 'IDLE',
+  dashboardStatus: 'IDLE',
+  errorMessage: null,
+  eventMessage: null,
+  
+  intakes: [],
   currentIntakeId: null,
+  currentIntake: null,
+
   setRawText: (text) => set({ rawText: text }),
+  setHasAudio: (hasAudio) => set({ hasAudio }),
+  setHasImage: (hasImage) => set({ hasImage }),
   setMediaStatus: (audio, image) => set({ hasAudio: audio, hasImage: image }),
   setStatus: (status) => set({ status }),
   setIntakeId: (id) => set({ currentIntakeId: id }),
   
-  login: async (email) => {
-    await fetch(`${API_BASE}/login`, {
-      method: 'POST',
-      body: JSON.stringify({ email, password: 'demo' }),
-    });
+  refreshTrackedIntakes: async () => {
+    set({ dashboardStatus: 'LOADING' });
+    try {
+      const trackedIds = JSON.parse(localStorage.getItem('briefly_tracked_intakes') || '[]');
+      if (trackedIds.length === 0) {
+        set({ intakes: [], dashboardStatus: 'IDLE' });
+        return;
+      }
+
+      const results = await Promise.allSettled(
+        trackedIds.map((id: string) => getIntake(id))
+      );
+
+      const successfulIntakes = results
+        .filter((r): r is PromiseFulfilledResult<IntakeRecord> => r.status === 'fulfilled')
+        .map(r => r.value)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      set({ intakes: successfulIntakes, dashboardStatus: 'IDLE' });
+    } catch (error) {
+      console.error('Failed to refresh intakes:', error);
+      set({ dashboardStatus: 'ERROR' });
+    }
   },
 
-  submitIntake: async () => {
-    const { rawText, hasAudio, hasImage } = get();
-    set({ status: 'UPLOADING' });
+  fetchIntake: async (id) => {
+    try {
+      const intake = await getIntake(id);
+      set({ currentIntake: intake });
+      return intake;
+    } catch (error) {
+      console.error('Failed to fetch intake:', error);
+      return null;
+    }
+  },
+
+  submitIntake: async (audioBlob, imageFile) => {
+    const { rawText } = get();
+    set({ status: 'UPLOADING', errorMessage: null, eventMessage: null });
 
     try {
-      const formData = new FormData();
-      formData.append('type', (hasAudio || hasImage) ? 'MULTI' : 'TEXT');
-      formData.append('raw_text', rawText);
-      // In a real demo, these would be actual Blob objects from the UI
-      if (hasAudio) formData.append('audio', new Blob(), 'memo.wav');
-      if (hasImage) formData.append('image', new Blob(), 'screenshot.png');
-
-      const response = await fetch(`${API_BASE}/intake`, {
-        method: 'POST',
-        body: formData,
+      const data = await apiSubmitIntake({
+        rawText,
+        audioBlob,
+        imageFile,
       });
 
-      if (!response.ok) throw new Error('Upload failed');
+      set({ currentIntakeId: data.intake_id, status: 'PROCESSING' });
       
-      const data = await response.json();
-      set({ currentIntakeId: data.id, status: 'PROCESSING' });
-      
-      // Start listening for the "COMPLETED" event
-      get().subscribeToEvents(data.id);
+      const tracked = JSON.parse(localStorage.getItem('briefly_tracked_intakes') || '[]');
+      localStorage.setItem('briefly_tracked_intakes', JSON.stringify([...new Set([data.intake_id, ...tracked])]));
+
+      get().subscribeToEvents(data.intake_id);
     } catch (error) {
       console.error(error);
-      set({ status: 'ERROR' });
+      set({ status: 'ERROR', errorMessage: error instanceof Error ? error.message : 'Unknown error' });
     }
   },
 
@@ -71,14 +117,20 @@ export const useIntakeStore = create<IntakeState>((set, get) => ({
     
     eventSource.onmessage = (event) => {
       console.log('SSE Event:', event.data);
-      if (event.data === 'COMPLETED') {
-        set({ status: 'COMPLETED' });
+      if (event.data === 'COMPLETED' || event.data === 'FAILED') {
+        set({ status: event.data === 'COMPLETED' ? 'COMPLETED' : 'ERROR' });
+        if (event.data === 'FAILED') set({ errorMessage: 'AI processing failed' });
+        void get().refreshTrackedIntakes(); 
+        void get().fetchIntake(id); 
         eventSource.close();
+      } else {
+        set({ eventMessage: event.data });
       }
     };
 
     eventSource.onerror = (err) => {
       console.error('SSE Error:', err);
+      set({ status: 'ERROR', errorMessage: 'Lost connection to update stream' });
       eventSource.close();
     };
   },
@@ -88,6 +140,9 @@ export const useIntakeStore = create<IntakeState>((set, get) => ({
     hasAudio: false,
     hasImage: false,
     status: 'IDLE',
-    currentIntakeId: null
+    currentIntakeId: null,
+    currentIntake: null,
+    errorMessage: null,
+    eventMessage: null
   })
 }));

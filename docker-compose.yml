@@ -9,9 +9,9 @@ services:
     container_name: briefly_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: briefly
-      POSTGRES_PASSWORD: briefly_secret
-      POSTGRES_DB: briefly_db
+      POSTGRES_USER: ${DB_USER:-briefly}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-briefly_secret}
+      POSTGRES_DB: ${DB_NAME:-briefly_db}
     ports:
       - "5432:5432"
     volumes:
@@ -51,12 +51,18 @@ services:
     container_name: briefly_api
     restart: unless-stopped
     environment:
-      DATABASE_URL: "postgres://briefly:briefly_secret@postgres:5432/briefly_db?sslmode=disable"
+      DATABASE_URL: "postgres://${DB_USER:-briefly}:${DB_PASSWORD:-briefly_secret}@postgres:5432/${DB_NAME:-briefly_db}?sslmode=disable"
       REDIS_URL: "redis://redis:6379"
       AI_SERVICE_URL: "http://ai_worker:8001"
+      JWT_SECRET: "${JWT_SECRET:-briefly_jwt_secret_change_me}"
+      # S3/MinIO Config
+      S3_ENDPOINT: "minio:9000"
+      S3_ACCESS_KEY: "${MINIO_USER:-briefly_admin}"
+      S3_SECRET_KEY: "${MINIO_PASSWORD:-briefly_storage_secret}"
+      S3_BUCKET: "briefly-media"
       PORT: "8080"
       ENV: "development"
-      GOGC: "200" # Trade RAM for lower CPU latency (as per Deep Analysis)
+      GOGC: "200" 
     ports:
       - "8080:8080"
     depends_on:
@@ -64,6 +70,27 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - media_data:/uploads
+
+  # ─────────────────────────────────────────────
+  # MinIO — Self-hosted S3 (Local VM Storage)
+  # ─────────────────────────────────────────────
+  minio:
+    image: minio/minio
+    container_name: briefly_minio
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-briefly_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-briefly_storage_secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
 
   # ─────────────────────────────────────────────
   # Python AI Worker
@@ -78,9 +105,27 @@ services:
       REDIS_URL: "redis://redis:6379"
       API_URL: "http://api:8080"
       GOOGLE_API_KEY: "${GOOGLE_API_KEY:-dummy}"
+      # S3/MinIO Config (AI needs to read images)
+      S3_ENDPOINT: "minio:9000"
+      S3_ACCESS_KEY: "${MINIO_USER:-briefly_admin}"
+      S3_SECRET_KEY: "${MINIO_PASSWORD:-briefly_storage_secret}"
     depends_on:
       redis:
         condition: service_healthy
+    volumes:
+      - media_data:/uploads
+
+  # ─────────────────────────────────────────────
+  # React Frontend
+  # ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: briefly_frontend
+    restart: unless-stopped
+    depends_on:
+      - api
 
   # ─────────────────────────────────────────────
   # Nginx Reverse Proxy (mirrors production)
@@ -92,10 +137,12 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - api
 
 volumes:
   postgres_data:
   redis_data:
+  media_data:
+  minio_data:

@@ -19,16 +19,19 @@ Do NOT use Redux or `useState` for global logic. Use the pre-scaffolded Zustand 
 *   `useAuthStore`: Manages the agency session. Auth is handled via HTTP-Only JWT cookies provided by the Go API. Do not store tokens in `localStorage`.
 *   `useIntakeStore`: Manages the drafted text, media toggles, and `status` ('IDLE' -> 'UPLOADING' -> 'PROCESSING').
 
-## 3. Real-Time Streaming (SSE)
-You will not use WebSockets or WebTransport. To receive real-time, zero-stutter updates from the AI pipeline, connect to the Go API using standard `EventSource` (SSE).
+## 3. Real-Time Streaming & Local Hosting
+Since the platform is hosted on the DevOps lead's **Laptop VM**, you will connect to the API via a **Cloudflare Quick Tunnel**.
+*   **The URL**: Get the current `trycloudflare.com` URL from the DevOps lead.
+*   **SSE**: Connect to the Go API using standard `EventSource` (SSE). The tunnel handles the SSL/TLS encryption automatically.
 ```javascript
 // Example SSE connection
-const eventSource = new EventSource(`/api/v1/events/${intakeId}`);
-eventSource.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  // Update state
-};
+const eventSource = new EventSource(`${API_URL}/api/v1/events/${intakeId}`);
 ```
+
+## 4. Media Storage (Local MinIO)
+All media uploads are stored in a private **MinIO** instance on the laptop. 
+*   **Access**: You don't need to change any code for this; the backend handles the S3 communication internally.
+*   **Limits**: Stick to the 25MB file limit to ensure the laptop's disk and RAM aren't overwhelmed.
 
 ## 4. How to Build Using an AI Agent
 When you want an AI (like Cursor or Gemini) to build a component for you, paste this exact prompt:

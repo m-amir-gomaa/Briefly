@@ -51,5 +51,16 @@
     docker-compose
   ];
 
+  # --- Mandatory Options for Evaluation ---
+  # These are usually provided by hardware-configuration.nix on a real system,
+  # but we need them here for the flake to evaluate successfully.
+  fileSystems."/" = { device = "/dev/sda1"; fsType = "ext4"; };
+  boot.loader.grub.enable = true;
+  boot.loader.grub.device = "/dev/sda";
+
+  # Accept ACME Terms
+  security.acme.acceptTerms = true;
+  security.acme.defaults.email = "admin@softworks.ai";
+
   system.stateVersion = "24.05"; 
 }

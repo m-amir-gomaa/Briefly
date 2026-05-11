@@ -59,6 +59,7 @@ type Brief struct {
 	CotLog            string         `json:"cot_log"`
 	ConfidenceScore   float32        `json:"confidence_score"`
 	ToneProfile       string         `json:"tone_profile"`
+	Embedding         datatypes.JSON `gorm:"type:jsonb" json:"embedding,omitempty"`
 	ShareToken        string         `gorm:"uniqueIndex;not null" json:"share_token"`
 	IsConfirmed       bool           `gorm:"default:false;not null" json:"is_confirmed"`
 	ConfirmedAt       *time.Time     `json:"confirmed_at"`

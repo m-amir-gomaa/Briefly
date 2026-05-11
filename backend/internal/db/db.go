@@ -20,6 +20,7 @@ var (
 func Init() {
 	initPostgres()
 	initRedis()
+	initS3()
 }
 
 func initPostgres() {

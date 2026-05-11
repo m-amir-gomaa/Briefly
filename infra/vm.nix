@@ -15,11 +15,11 @@
 
   # Docker Stack
   virtualisation.docker.enable = true;
-  virtualisation.docker.onBoot = true;
 
   # SSH for Host -> VM communication
   services.openssh = {
     enable = true;
+    openFirewall = true;
     settings.PermitRootLogin = "yes";
   };
 
@@ -29,7 +29,7 @@
     extraGroups = [ "wheel" "docker" ];
     password = "briefly_secret"; # Standardized for the team
     openssh.authorizedKeys.keys = [
-      # The VM will automatically trust the host's SSH key if you add it here
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG1BM44wWxyKlM5wkmoY384YtpvnEiyl59OyhDF89l4x mo.gomaa.formal@gmail.com"
     ];
   };
 
@@ -43,10 +43,27 @@
     cloudflared # For the tunnel
   ];
 
+  # Disable firewall entirely for the fortress VM
+  networking.firewall.enable = false;
+
   # QEMU VM Resources
-  virtualisation.memorySize = 4096; # 4GB RAM
-  virtualisation.cores = 2;
-  virtualisation.diskSize = 40960; # 40GB Disk
+  virtualisation.memorySize = 4096;
+  virtualisation.diskSize = 40960;
+
+  # CPU: 2 cores via QEMU SMP
+  virtualisation.qemu.options = [
+    "-cpu host"
+    "-enable-kvm"
+    "-smp 2"
+  ];
+
+  # Port forwards — NixOS wires these through the default user-mode NIC safely.
+  # SSH: host 2223 → guest 22
+  # HTTP: host 8080 → guest 80
+  virtualisation.forwardPorts = [
+    { from = "host"; host.port = 2223; guest.port = 22; }
+    { from = "host"; host.port = 9999; guest.port = 80; }
+  ];
 
   # QEMU Guest Agent for better host integration
   services.qemuGuest.enable = true;
