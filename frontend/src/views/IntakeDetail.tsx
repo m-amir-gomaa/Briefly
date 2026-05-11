@@ -80,7 +80,7 @@ export default function IntakeDetailView({ intakeId, onNavigate }: IntakeDetailP
       <div className="flex min-h-[50vh] items-center justify-center">
         <Card className="flex items-center gap-3">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm font-semibold text-zinc-700">Loading intake</span>
+          <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Loading intake</span>
         </Card>
       </div>
     )
@@ -90,8 +90,8 @@ export default function IntakeDetailView({ intakeId, onNavigate }: IntakeDetailP
     return (
       <Card className="mx-auto max-w-lg text-center">
         <AlertCircle className="mx-auto h-9 w-9 text-red-600" />
-        <h1 className="mt-4 text-xl font-semibold text-zinc-950">Intake unavailable</h1>
-        <p className="mt-2 text-sm leading-6 text-zinc-600">{error || 'The requested intake was not found.'}</p>
+        <h1 className="mt-4 text-xl font-semibold text-zinc-950 dark:text-zinc-100">Intake unavailable</h1>
+        <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{error || 'The requested intake was not found.'}</p>
         <Button
           className="mx-auto mt-5"
           onClick={() => onNavigate('/dashboard')}
@@ -117,8 +117,8 @@ export default function IntakeDetailView({ intakeId, onNavigate }: IntakeDetailP
           >
             Dashboard
           </Button>
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-500">Brief review</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950 sm:text-4xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">Brief review</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950 sm:text-4xl dark:text-zinc-50">
             Review generated brief
           </h1>
           <p className="mt-2 break-all font-mono text-xs text-zinc-500">{intake.id}</p>
@@ -148,12 +148,12 @@ export default function IntakeDetailView({ intakeId, onNavigate }: IntakeDetailP
 
           <Card>
             <div className="mb-4 flex items-center gap-2">
-              <FileText className="h-4 w-4 text-zinc-500" />
-              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-500">
+              <FileText className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">
                 Original intake
               </h2>
             </div>
-            <p className="whitespace-pre-wrap text-sm leading-7 text-zinc-700">
+            <p className="whitespace-pre-wrap text-sm leading-7 text-zinc-700 dark:text-zinc-300">
               {intake.raw_text || 'No text was submitted with this intake.'}
             </p>
           </Card>
@@ -165,8 +165,8 @@ export default function IntakeDetailView({ intakeId, onNavigate }: IntakeDetailP
           ) : (
             <Card className="text-center">
               <Loader2 className="mx-auto h-6 w-6 animate-spin text-zinc-500" />
-              <h2 className="mt-4 text-lg font-semibold text-zinc-950">Brief pending</h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-600">
+              <h2 className="mt-4 text-lg font-semibold text-zinc-950 dark:text-zinc-100">Brief pending</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
                 The generated document will appear here after the worker writes it to the API.
               </p>
             </Card>
@@ -175,29 +175,29 @@ export default function IntakeDetailView({ intakeId, onNavigate }: IntakeDetailP
 
         <aside className="space-y-4">
           <Card>
-            <h2 className="text-sm font-semibold text-zinc-950">Metadata</h2>
+            <h2 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">Metadata</h2>
             <dl className="mt-4 space-y-3 text-sm">
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-zinc-500">Type</dt>
-                <dd className="font-semibold text-zinc-950">{intake.type}</dd>
+                <dt className="text-zinc-500 dark:text-zinc-400">Type</dt>
+                <dd className="font-semibold text-zinc-950 dark:text-zinc-100">{intake.type}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-zinc-500">Created</dt>
-                <dd className="text-right font-semibold text-zinc-950">{formatDate(intake.created_at)}</dd>
+                <dt className="text-zinc-500 dark:text-zinc-400">Created</dt>
+                <dd className="text-right font-semibold text-zinc-950 dark:text-zinc-100">{formatDate(intake.created_at)}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-zinc-500">Updated</dt>
-                <dd className="text-right font-semibold text-zinc-950">{formatDate(intake.updated_at)}</dd>
+                <dt className="text-zinc-500 dark:text-zinc-400">Updated</dt>
+                <dd className="text-right font-semibold text-zinc-950 dark:text-zinc-100">{formatDate(intake.updated_at)}</dd>
               </div>
               {brief && (
                 <>
                   <div className="flex items-center justify-between gap-3">
-                    <dt className="text-zinc-500">Confidence</dt>
-                    <dd className="font-semibold text-zinc-950">{Math.round(brief.confidence_score * 100)}%</dd>
+                    <dt className="text-zinc-500 dark:text-zinc-400">Confidence</dt>
+                    <dd className="font-semibold text-zinc-950 dark:text-zinc-100">{Math.round(brief.confidence_score * 100)}%</dd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <dt className="text-zinc-500">Confirmed</dt>
-                    <dd className="font-semibold text-zinc-950">{brief.is_confirmed ? 'Yes' : 'No'}</dd>
+                    <dt className="text-zinc-500 dark:text-zinc-400">Confirmed</dt>
+                    <dd className="font-semibold text-zinc-950 dark:text-zinc-100">{brief.is_confirmed ? 'Yes' : 'No'}</dd>
                   </div>
                 </>
               )}
@@ -206,7 +206,7 @@ export default function IntakeDetailView({ intakeId, onNavigate }: IntakeDetailP
 
           {brief?.share_token && (
             <Card>
-              <h2 className="text-sm font-semibold text-zinc-950">Public document</h2>
+              <h2 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">Public document</h2>
               <p className="mt-2 break-all font-mono text-xs leading-5 text-zinc-500">{publicUrl}</p>
               <div className="mt-4 grid gap-2">
                 <Button

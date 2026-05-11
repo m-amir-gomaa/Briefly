@@ -41,7 +41,7 @@ export default function ImageDropzone({ imageFile, disabled, onChange }: ImageDr
 
   if (imageFile && preview) {
     return (
-      <div className="overflow-hidden rounded-md border border-zinc-200 bg-white">
+      <div className="overflow-hidden rounded-md border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800">
         <div className="relative">
           <img src={preview} alt="" className="h-32 w-full object-cover" />
           <button
@@ -53,7 +53,7 @@ export default function ImageDropzone({ imageFile, disabled, onChange }: ImageDr
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs text-zinc-500">
+        <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400">
           <span className="truncate">{imageFile.name}</span>
           <span className="shrink-0">{formatBytes(imageFile.size)}</span>
         </div>
@@ -74,8 +74,8 @@ export default function ImageDropzone({ imageFile, disabled, onChange }: ImageDr
         className={[
           'flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed px-4 py-5 text-center transition-all duration-200 ease-in-out',
           dragOver
-            ? 'border-zinc-500 bg-zinc-100 text-zinc-950'
-            : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:text-zinc-950',
+            ? 'border-zinc-500 bg-zinc-100 text-zinc-950 dark:bg-zinc-700 dark:text-zinc-100'
+            : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-100',
           disabled ? 'pointer-events-none opacity-50' : '',
         ].join(' ')}
       >

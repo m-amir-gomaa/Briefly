@@ -51,10 +51,10 @@ export default function ProcessingChecklist({
   ]
 
   return (
-    <div className="rounded-xl border border-white/20 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+    <div className="rounded-xl border border-white/20 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-zinc-700 dark:bg-zinc-900/70">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-zinc-950">Processing pipeline</p>
-        <span className="text-xs font-medium text-zinc-500">SSE connected</span>
+        <p className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">Processing pipeline</p>
+        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">SSE connected</span>
       </div>
 
       <div className="space-y-2">
@@ -69,14 +69,14 @@ export default function ProcessingChecklist({
               ) : isActive ? (
                 <Loader2 className="h-4 w-4 shrink-0 animate-spin text-amber-700" />
               ) : (
-                <Circle className="h-4 w-4 shrink-0 text-zinc-300" />
+                <Circle className="h-4 w-4 shrink-0 text-zinc-300 dark:text-zinc-600" />
               )}
               <span
                 className={[
                   'text-sm',
-                  isComplete ? 'font-semibold text-zinc-950' : '',
+                  isComplete ? 'font-semibold text-zinc-950 dark:text-zinc-100' : '',
                   isActive ? 'font-semibold text-amber-800' : '',
-                  !isComplete && !isActive ? 'text-zinc-500' : '',
+                  !isComplete && !isActive ? 'text-zinc-500 dark:text-zinc-400' : '',
                 ].join(' ')}
               >
                 {step.label}

@@ -62,15 +62,15 @@ export default function AudioRecorder({ audioBlob, disabled, onChange }: AudioRe
   return (
     <div className="space-y-2">
       {audioBlob ? (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800">
           <div className="min-w-0">
-            <p className="font-semibold text-zinc-950">Audio attached</p>
-            <p className="text-xs text-zinc-500">{formatBytes(audioBlob.size)}</p>
+            <p className="font-semibold text-zinc-950 dark:text-zinc-100">Audio attached</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">{formatBytes(audioBlob.size)}</p>
           </div>
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="rounded-md p-2 text-zinc-500 transition-all duration-200 ease-in-out hover:bg-zinc-100 hover:text-zinc-950"
+            className="rounded-md p-2 text-zinc-500 transition-all duration-200 ease-in-out hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
             aria-label="Remove audio"
           >
             <X className="h-4 w-4" />

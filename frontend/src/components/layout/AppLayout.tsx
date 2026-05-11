@@ -1,9 +1,12 @@
+import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   FilePlus2,
   LayoutDashboard,
   LogOut,
+  Moon,
   Settings,
+  Sun,
   Zap,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -41,18 +44,33 @@ function isActive(currentPath: string, itemPath: string) {
   return currentPath.startsWith(itemPath)
 }
 
+function getInitialDarkMode(): boolean {
+  try {
+    const stored = localStorage.getItem('briefly-dark-mode')
+    if (stored !== null) return stored === 'true'
+  } catch { /* ignore */ }
+  return false
+}
+
 export default function AppLayout({ children, currentPath, onNavigate }: AppLayoutProps) {
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const breadcrumb = getBreadcrumb(currentPath)
+  const [darkMode, setDarkMode] = useState(getInitialDarkMode)
+
+  // Sync dark mode class
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode)
+    try { localStorage.setItem('briefly-dark-mode', String(darkMode)) } catch { /* ignore */ }
+  }, [darkMode])
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950 lg:grid lg:grid-cols-[76px_minmax(0,1fr)]">
-      <aside className="hidden border-r border-zinc-200 bg-white lg:flex lg:min-h-screen lg:flex-col lg:items-center lg:py-4">
+    <div className="min-h-screen bg-zinc-50 text-zinc-950 transition-colors duration-300 dark:bg-zinc-950 dark:text-zinc-100 lg:grid lg:grid-cols-[76px_minmax(0,1fr)]">
+      <aside className="hidden border-r border-zinc-200 bg-white lg:flex lg:min-h-screen lg:flex-col lg:items-center lg:py-4 dark:border-zinc-800 dark:bg-zinc-900">
         <button
           type="button"
           onClick={() => onNavigate('/dashboard')}
-          className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-950 text-white shadow-sm transition-all duration-200 ease-in-out hover:bg-zinc-800"
+          className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-950 text-white shadow-sm transition-all duration-200 ease-in-out hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
           aria-label="Go to dashboard"
         >
           <Zap className="h-5 w-5" />
@@ -72,8 +90,8 @@ export default function AppLayout({ children, currentPath, onNavigate }: AppLayo
                 className={[
                   'flex h-11 w-11 items-center justify-center rounded-md transition-all duration-200 ease-in-out',
                   active
-                    ? 'bg-zinc-950 text-white shadow-sm'
-                    : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950',
+                    ? 'bg-zinc-950 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-950'
+                    : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100',
                 ].join(' ')}
                 aria-label={item.label}
               >
@@ -90,7 +108,7 @@ export default function AppLayout({ children, currentPath, onNavigate }: AppLayo
             onNavigate('/login')
           }}
           title="Sign out"
-          className="flex h-11 w-11 items-center justify-center rounded-md text-zinc-500 transition-all duration-200 ease-in-out hover:bg-zinc-100 hover:text-zinc-950"
+          className="flex h-11 w-11 items-center justify-center rounded-md text-zinc-500 transition-all duration-200 ease-in-out hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
           aria-label="Sign out"
         >
           <LogOut className="h-5 w-5" />
@@ -98,22 +116,22 @@ export default function AppLayout({ children, currentPath, onNavigate }: AppLayo
       </aside>
 
       <main className="min-w-0">
-        <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/85 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/85 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/85">
           <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
                 onClick={() => onNavigate('/dashboard')}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-950 text-white lg:hidden"
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-950 text-white lg:hidden dark:bg-zinc-100 dark:text-zinc-950"
                 aria-label="Go to dashboard"
               >
                 <Zap className="h-5 w-5" />
               </button>
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-zinc-500">
+                <p className="truncate text-sm font-medium text-zinc-500 dark:text-zinc-400">
                   {breadcrumb.join(' / ')}
                 </p>
-                <p className="truncate text-base font-semibold text-zinc-950">
+                <p className="truncate text-base font-semibold text-zinc-950 dark:text-zinc-100">
                   {breadcrumb[breadcrumb.length - 1]}
                 </p>
               </div>
@@ -121,10 +139,19 @@ export default function AppLayout({ children, currentPath, onNavigate }: AppLayo
 
             <div className="flex items-center gap-2">
               <LanguageToggle />
+              {/* Dark mode toggle */}
+              <button
+                type="button"
+                onClick={() => setDarkMode((prev) => !prev)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-sm transition-all duration-200 ease-in-out hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-100"
+                aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {darkMode ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+              </button>
               <button
                 type="button"
                 onClick={() => onNavigate('/account')}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-sm font-semibold text-zinc-700 shadow-sm transition-all duration-200 ease-in-out hover:border-zinc-300"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-sm font-semibold text-zinc-700 shadow-sm transition-all duration-200 ease-in-out hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600"
                 aria-label="Open account"
               >
                 {(user?.agencyName || 'D').slice(0, 1).toUpperCase()}

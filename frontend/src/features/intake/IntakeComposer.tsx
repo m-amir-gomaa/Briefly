@@ -58,18 +58,18 @@ export default function IntakeComposer({ onNavigate }: IntakeComposerProps) {
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <section className="space-y-4">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-500">
+          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">
             Creative workspace
           </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950 sm:text-4xl">
+          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950 sm:text-4xl dark:text-zinc-50">
             Turn loose intake into a client-ready brief
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
             Capture notes, voice, and visual context in one place. Briefly will structure the messy parts after submission.
           </p>
         </div>
 
-        <Card padded={false} className="overflow-hidden border-white/20 bg-white shadow-sm">
+        <Card padded={false} className="overflow-hidden border-white/20 bg-white shadow-sm dark:bg-zinc-900">
           <div className="px-5 pt-5">
             <label htmlFor="intake-composer" className="sr-only">
               Intake notes
@@ -81,22 +81,22 @@ export default function IntakeComposer({ onNavigate }: IntakeComposerProps) {
               onChange={(event) => setRawText(event.target.value)}
               placeholder="Paste meeting notes, client messages, project context, or requirements..."
               disabled={status !== 'IDLE'}
-              className="block min-h-[320px] w-full resize-none border-0 bg-transparent p-0 text-lg leading-8 text-zinc-950 outline-none placeholder:text-zinc-400 disabled:opacity-60"
+              className="block min-h-[320px] w-full resize-none border-0 bg-transparent p-0 text-lg leading-8 text-zinc-950 outline-none placeholder:text-zinc-400 disabled:opacity-60 dark:text-zinc-100 dark:placeholder:text-zinc-500"
             />
           </div>
 
-          <div className="sticky bottom-0 border-t border-zinc-200 bg-white/90 px-4 py-4 backdrop-blur-xl">
+          <div className="sticky bottom-0 border-t border-zinc-200 bg-white/90 px-4 py-4 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/90">
             <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
-              <div className="rounded-xl bg-zinc-50 p-3">
-                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500">
+              <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
                   <Mic className="h-3.5 w-3.5" />
                   Audio
                 </div>
                 <AudioRecorder audioBlob={audioBlob} disabled={status !== 'IDLE'} onChange={handleAudioChange} />
               </div>
 
-              <div className="rounded-xl bg-zinc-50 p-3">
-                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500">
+              <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
                   <Image className="h-3.5 w-3.5" />
                   Image
                 </div>
@@ -113,7 +113,7 @@ export default function IntakeComposer({ onNavigate }: IntakeComposerProps) {
                 >
                   Generate
                 </Button>
-                <p className="text-center text-xs text-zinc-500">{rawText.length} chars</p>
+                <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">{rawText.length} chars</p>
               </div>
             </div>
           </div>
@@ -131,12 +131,12 @@ export default function IntakeComposer({ onNavigate }: IntakeComposerProps) {
 
         <Card>
           <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               <FileText className="h-4 w-4" />
             </span>
             <div>
-              <h2 className="text-sm font-semibold text-zinc-950">Submission state</h2>
-              <p className="mt-1 text-sm leading-6 text-zinc-600">
+              <h2 className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">Submission state</h2>
+              <p className="mt-1 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
                 {status === 'IDLE' && 'Add at least one input to generate a brief.'}
                 {status === 'UPLOADING' && 'Uploading payload to the Go API.'}
                 {status === 'PROCESSING' && (eventMessage || 'Waiting for worker completion through SSE.')}

@@ -4,6 +4,7 @@ import AccountView from './views/Account'
 import AuthView from './views/Auth'
 import DashboardView from './views/Dashboard'
 import HomeView from './views/Home'
+import ForgotPasswordView from './views/ForgotPassword'
 import IntakeView from './views/Intake'
 import IntakeDetailView from './views/IntakeDetail'
 import PublicBriefView from './views/PublicBrief'
@@ -36,6 +37,10 @@ function App() {
 
   if (path === '/') {
     return <HomeView onNavigate={navigate} />
+  }
+
+  if (path === '/forgot-password') {
+    return <ForgotPasswordView onNavigate={navigate} />
   }
 
   if (path === '/login' || (!isAuthenticated && path !== '/register')) {

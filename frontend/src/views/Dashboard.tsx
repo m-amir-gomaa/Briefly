@@ -63,11 +63,11 @@ export default function DashboardView({ onNavigate }: DashboardProps) {
     <div className="space-y-6">
       <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-500">Dashboard</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950 sm:text-4xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">Dashboard</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950 sm:text-4xl dark:text-zinc-50">
             Brief pipeline
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
             Track intakes from raw input to client approval. This dashboard hydrates browser-tracked records from the backend.
           </p>
         </div>
@@ -98,10 +98,10 @@ export default function DashboardView({ onNavigate }: DashboardProps) {
             <Card key={stat.label}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-zinc-500">{stat.label}</p>
-                  <p className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950">{stat.value}</p>
+                  <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{stat.label}</p>
+                  <p className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950 dark:text-zinc-100">{stat.value}</p>
                 </div>
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                   <Icon className="h-5 w-5" />
                 </span>
               </div>
@@ -111,10 +111,10 @@ export default function DashboardView({ onNavigate }: DashboardProps) {
       </section>
 
       <Card padded={false} className="overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-zinc-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-zinc-200 p-5 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800">
           <div>
-            <h2 className="text-base font-semibold text-zinc-950">Past intakes</h2>
-            <p className="text-sm text-zinc-500">Clean table view with backend status and share links.</p>
+            <h2 className="text-base font-semibold text-zinc-950 dark:text-zinc-100">Past intakes</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Clean table view with backend status and share links.</p>
           </div>
           {dashboardStatus === 'LOADING' && (
             <span className="inline-flex items-center gap-2 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
@@ -126,11 +126,11 @@ export default function DashboardView({ onNavigate }: DashboardProps) {
 
         {!intakes.length && dashboardStatus !== 'LOADING' ? (
           <div className="flex flex-col items-center justify-center px-5 py-16 text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
+            <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               <ClipboardList className="h-6 w-6" />
             </span>
-            <h3 className="mt-5 text-xl font-semibold text-zinc-950">No intakes yet</h3>
-            <p className="mt-2 max-w-md text-sm leading-6 text-zinc-600">
+            <h3 className="mt-5 text-xl font-semibold text-zinc-950 dark:text-zinc-100">No intakes yet</h3>
+            <p className="mt-2 max-w-md text-sm leading-6 text-zinc-600 dark:text-zinc-400">
               Start with your first client notes, voice memo, or whiteboard screenshot and Briefly will build the structured document.
             </p>
             <Button
@@ -143,8 +143,8 @@ export default function DashboardView({ onNavigate }: DashboardProps) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-200 text-left text-sm">
-              <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500">
+            <table className="min-w-full divide-y divide-zinc-200 text-left text-sm dark:divide-zinc-800">
+              <thead className="bg-zinc-50 text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
                 <tr>
                   <th className="px-5 py-3">Brief</th>
                   <th className="px-5 py-3">Type</th>
@@ -153,24 +153,24 @@ export default function DashboardView({ onNavigate }: DashboardProps) {
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 bg-white">
+              <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-900">
                 {intakes.map((record) => (
-                  <tr key={record.id} className="transition-all duration-200 ease-in-out hover:bg-zinc-50">
+                  <tr key={record.id} className="transition-all duration-200 ease-in-out hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                     <td className="max-w-xl px-5 py-4">
                       <button
                         type="button"
                         onClick={() => onNavigate(`/intake/${record.id}`)}
                         className="block max-w-full text-left"
                       >
-                        <span className="block truncate font-semibold text-zinc-950">{getTitle(record)}</span>
-                        <span className="mt-1 block truncate font-mono text-xs text-zinc-500">{record.id}</span>
+                        <span className="block truncate font-semibold text-zinc-950 dark:text-zinc-100">{getTitle(record)}</span>
+                        <span className="mt-1 block truncate font-mono text-xs text-zinc-500 dark:text-zinc-500">{record.id}</span>
                       </button>
                     </td>
-                    <td className="px-5 py-4 font-semibold text-zinc-700">{record.type}</td>
+                    <td className="px-5 py-4 font-semibold text-zinc-700 dark:text-zinc-300">{record.type}</td>
                     <td className="px-5 py-4">
                       <StatusBadge status={record.status} />
                     </td>
-                    <td className="px-5 py-4 text-zinc-600">{formatDate(record.created_at)}</td>
+                    <td className="px-5 py-4 text-zinc-600 dark:text-zinc-400">{formatDate(record.created_at)}</td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">
                         {record.brief?.share_token && (

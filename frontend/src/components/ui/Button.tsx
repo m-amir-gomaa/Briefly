@@ -10,9 +10,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClass: Record<ButtonVariant, string> = {
-  primary: 'bg-zinc-950 text-white shadow-sm hover:bg-zinc-800',
-  secondary: 'border border-zinc-200 bg-white text-zinc-800 hover:border-zinc-300 hover:bg-zinc-50',
-  ghost: 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950',
+  primary: 'bg-zinc-950 text-white shadow-sm hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200',
+  secondary: 'border border-zinc-200 bg-white text-zinc-800 hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-600 dark:hover:bg-zinc-800',
+  ghost: 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100',
   danger: 'bg-red-600 text-white shadow-sm hover:bg-red-700',
 }
 
@@ -35,7 +35,7 @@ export default function Button({
     <button
       type={type}
       className={[
-        'inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-all duration-200 ease-in-out focus:outline-none focus:ring-4 focus:ring-zinc-200 disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex items-center justify-center gap-2 rounded-md font-semibold transition-all duration-200 ease-in-out focus:outline-none focus:ring-4 focus:ring-zinc-200 disabled:pointer-events-none disabled:opacity-50 dark:focus:ring-zinc-700',
         variantClass[variant],
         sizeClass[size],
         className,

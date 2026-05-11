@@ -1,12 +1,20 @@
-import { Mail, LockKeyhole, UserPlus } from 'lucide-react'
+import { motion } from 'framer-motion'
 import type { FormEvent } from 'react'
-import Button from '../../components/ui/Button'
-import Input from '../../components/ui/Input'
 import { useAuthStore } from '../../store/useAuthStore'
 
 interface AuthFormProps {
   mode: 'login' | 'register'
   onNavigate: (path: string) => void
+}
+
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
+}
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] as const } },
 }
 
 export default function AuthForm({ mode, onNavigate }: AuthFormProps) {
@@ -20,57 +28,99 @@ export default function AuthForm({ mode, onNavigate }: AuthFormProps) {
     onNavigate('/dashboard')
   }
 
+  const inputClass =
+    'w-full rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm text-zinc-950 outline-none transition-all duration-200 placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-4 focus:ring-zinc-200/60 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-400 dark:focus:ring-zinc-700/40'
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <motion.form
+      onSubmit={handleSubmit}
+      variants={stagger}
+      initial="hidden"
+      animate="show"
+      className="space-y-4"
+    >
       {isRegister && (
-        <label className="block">
-          <span className="mb-1.5 block text-xs font-semibold text-zinc-600">Agency name</span>
-          <Input name="agency" placeholder="Northstar Studio" />
-        </label>
+        <motion.div variants={fadeUp} className="grid grid-cols-2 gap-3">
+          <input
+            name="firstName"
+            placeholder="First Name"
+            className={inputClass}
+            required
+          />
+          <input
+            name="lastName"
+            placeholder="Last Name"
+            className={inputClass}
+            required
+          />
+        </motion.div>
       )}
 
-      <label className="block">
-        <span className="mb-1.5 block text-xs font-semibold text-zinc-600">Email</span>
-        <div className="relative">
-          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-          <Input
-            name="email"
-            type="email"
-            defaultValue="demo@briefly.ai"
-            className="pl-9"
-            required
-          />
-        </div>
-      </label>
+      <motion.div variants={fadeUp}>
+        <input
+          name="email"
+          type="email"
+          placeholder="Email"
+          defaultValue={isRegister ? '' : 'demo@briefly.ai'}
+          className={inputClass}
+          required
+        />
+      </motion.div>
 
-      <label className="block">
-        <span className="mb-1.5 block text-xs font-semibold text-zinc-600">Password</span>
-        <div className="relative">
-          <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-          <Input
-            name="password"
+      <motion.div variants={fadeUp}>
+        <input
+          name="password"
+          type="password"
+          placeholder="Password"
+          defaultValue={isRegister ? '' : 'briefly-demo'}
+          className={inputClass}
+          required
+        />
+      </motion.div>
+
+      {isRegister && (
+        <motion.div variants={fadeUp}>
+          <input
+            name="confirmPassword"
             type="password"
-            defaultValue="briefly-demo"
-            className="pl-9"
-            required
+            placeholder="Confirm Password"
+            className={inputClass}
           />
-        </div>
-      </label>
+        </motion.div>
+      )}
 
-      <Button type="submit" size="lg" className="w-full" icon={isRegister ? <UserPlus className="h-4 w-4" /> : undefined}>
-        {isRegister ? 'Create workspace' : 'Sign in'}
-      </Button>
+      {/* Forgot password — login only */}
+      {!isRegister && (
+        <motion.div variants={fadeUp} className="text-right">
+          <button
+            type="button"
+            onClick={() => onNavigate('/forgot-password')}
+            className="text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200"
+          >
+            Forgot password?
+          </button>
+        </motion.div>
+      )}
 
-      <p className="text-center text-sm text-zinc-600">
-        {isRegister ? 'Already have a workspace?' : 'Need a workspace?'}{' '}
+      <motion.div variants={fadeUp} className="pt-2">
+        <button
+          type="submit"
+          className="w-full rounded-full bg-zinc-950 py-3.5 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
+        >
+          {isRegister ? 'Sign up' : 'Sign in'}
+        </button>
+      </motion.div>
+
+      <motion.p variants={fadeUp} className="pt-2 text-center text-sm text-zinc-500 dark:text-zinc-400">
+        {isRegister ? 'Already have an account?' : 'First time?'}{' '}
         <button
           type="button"
           onClick={() => onNavigate(isRegister ? '/login' : '/register')}
-          className="font-semibold text-zinc-950 underline-offset-4 hover:underline"
+          className="font-semibold text-blue-600 underline-offset-4 hover:underline dark:text-blue-400"
         >
-          {isRegister ? 'Sign in' : 'Create one'}
+          {isRegister ? 'Sign in' : 'Sign Up now'}
         </button>
-      </p>
-    </form>
+      </motion.p>
+    </motion.form>
   )
 }

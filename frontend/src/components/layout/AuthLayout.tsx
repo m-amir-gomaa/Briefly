@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion'
-import { Zap } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 interface AuthLayoutProps {
@@ -10,29 +9,37 @@ interface AuthLayoutProps {
 
 export default function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-950 px-4 py-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(99,102,241,0.32),transparent_32%),radial-gradient(circle_at_80%_70%,rgba(20,184,166,0.24),transparent_30%)]" />
-      <div className="absolute inset-0 bg-zinc-950/35 backdrop-blur-3xl" />
+    <div className="auth-gradient-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-10">
+      {/* Logo — centered above card */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+        className="relative z-10 mb-8"
+      >
+        <img
+          src="/logo-title-black.png"
+          alt="Briefly"
+          className="h-7 dark:invert"
+          draggable={false}
+        />
+      </motion.div>
 
+      {/* Card */}
       <motion.div
         initial={{ opacity: 0, y: 18, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.35, ease: 'easeOut' }}
-        className="relative z-10 w-full max-w-md rounded-xl border border-white/20 bg-white/70 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl"
+        transition={{ duration: 0.35, ease: 'easeOut', delay: 0.05 }}
+        className="relative z-10 w-full max-w-md rounded-2xl border border-zinc-200/60 bg-white/80 px-8 py-10 shadow-xl shadow-zinc-300/20 backdrop-blur-xl dark:border-zinc-700/50 dark:bg-zinc-900/80 dark:shadow-black/30"
       >
-        <div className="mb-8 flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-950 text-white">
-            <Zap className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-lg font-semibold tracking-normal text-zinc-950">Briefly</p>
-            <p className="text-xs font-medium text-zinc-500">AI project briefs</p>
-          </div>
-        </div>
-
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-normal text-zinc-950">{title}</h1>
-          <p className="mt-2 text-sm leading-6 text-zinc-600">{subtitle}</p>
+        {/* Heading */}
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl font-semibold italic tracking-normal text-zinc-950 dark:text-zinc-50">
+            {title}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+            {subtitle}
+          </p>
         </div>
 
         {children}

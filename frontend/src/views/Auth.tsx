@@ -11,11 +11,11 @@ export default function AuthView({ mode, onNavigate }: AuthViewProps) {
 
   return (
     <AuthLayout
-      title={isRegister ? 'Create your Briefly workspace' : 'Welcome back'}
+      title={isRegister ? 'Sign up' : 'Welcome back'}
       subtitle={
         isRegister
-          ? 'Set up the workspace where raw client inputs become structured briefs.'
-          : 'Sign in to continue managing client intakes and approvals.'
+          ? 'Welcome to Briefly'
+          : 'Sign in to continue managing your briefs.'
       }
     >
       <AuthForm mode={mode} onNavigate={onNavigate} />
