@@ -1,0 +1,65 @@
+name: "Briefly CI/CD"
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-nix:
+    name: "Validate Nix Flake"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v25
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: "Check Flake"
+        run: nix flake check
+
+  test-backend:
+    name: "Test Go Backend"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: backend/go.sum
+      - name: "Lint & Test"
+        working-directory: ./backend
+        run: |
+          go mod download
+          go test ./... -v
+
+  test-frontend:
+    name: "Test React Frontend"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: "Build & Lint"
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run build
+
+  deploy:
+    name: "Deploy to Production"
+    needs: [validate-nix, test-backend, test-frontend]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v25
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: "Deploy via deploy-rs"
+        run: nix run .#deploy .#vps
