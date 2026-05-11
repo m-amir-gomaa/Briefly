@@ -51,6 +51,21 @@
             echo ""
             export GOPATH="$PWD/.gopath"
             export PATH="$GOPATH/bin:$PATH"
+
+            # Setup Python virtual environment automatically
+            VENV_DIR="$PWD/.venv"
+            if [ ! -d "$VENV_DIR" ]; then
+              echo "🐍 Creating Python virtual environment..."
+              python -m venv "$VENV_DIR"
+            fi
+            
+            # Activate the virtual environment
+            source "$VENV_DIR/bin/activate"
+            
+            # Install requirements if they exist
+            if [ -f "$PWD/ai_service/requirements.txt" ]; then
+              pip install -q -r "$PWD/ai_service/requirements.txt"
+            fi
           '';
         };
 
