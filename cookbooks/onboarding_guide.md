@@ -30,50 +30,43 @@ This gives you the exact versions of Go 1.23, Python 3.11, Node, and all tools l
 
 ---
 
-## 3. Configure Your Environment
+## 3. Launch the Standardized VM
+
+To ensure a clean environment, we provide a pre-configured NixOS VM.
 
 ```bash
-cp .env.example .env
+# Build and run the Briefly VM
+nix build .#nixosConfigurations.vm.config.system.build.vm && ./result/bin/run-briefly-vm-vm
 ```
 
-Edit `.env` and fill in:
-
-| Variable | Description |
-|---|---|
-| `GOOGLE_API_KEY` | Your Gemini 1.5 Flash API key |
-| `NODE_IP` | Your Tailscale IP (see step 4) |
-| `DATABASE_URL` | CockroachDB URL (Alpha node provides this) |
-| `REDIS_URL` | Redis node URL (Alpha node provides this) |
-| `REDIS_CLUSTER_MODE` | `false` for local dev, `true` for multi-node |
+The VM will start and map:
+- **SSH**: `localhost:2223` (User: `briefly`, Password: `briefly_secret`)
+- **Web**: `localhost:9999`
 
 ---
 
-## 4. Join the Private Mesh (Tailscale)
-
-We use Tailscale to connect all 5 laptops without touching router settings.
+## 4. Configure Your Environment
 
 ```bash
-# Install and authenticate
-sudo tailscale up
-
-# Get your node IP
-tailscale ip -4
+cp infra/distributed.env.example .env
 ```
 
-Share your Tailscale IP with the Team Lead. They will confirm when you appear in the mesh.
+Edit `.env` and fill in your Tailscale IP and the Alpha node's addresses.
 
 ---
 
-## 5. Launch the Stack
+## 5. Join the Pentagram Mesh
 
-**Single-machine (local dev):**
+On your laptop (or inside the VM):
+
+**If you are the Alpha Node (Seed):**
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.node.yml --profile data up -d --build
 ```
 
-**Distributed (joining the Pentagram mesh):**
+**If you are a Joiner Node (Teammate):**
 ```bash
-docker compose -f docker-compose.distributed.yml up -d --build
+docker compose -f docker-compose.node.yml up -d --build
 ```
 
 Services and ports:

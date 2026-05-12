@@ -41,10 +41,17 @@
     htop
     docker-compose
     cloudflared # For the tunnel
+    tailscale   # To join the mesh
   ];
+
+  # Tailscale service
+  services.tailscale.enable = true;
 
   # Disable firewall entirely for the fortress VM
   networking.firewall.enable = false;
+
+  # Time synchronization (CRITICAL for CockroachDB distributed consistency)
+  services.chrony.enable = true;
 
   # QEMU VM Resources
   virtualisation.memorySize = 4096;
