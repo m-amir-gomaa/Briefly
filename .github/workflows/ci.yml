@@ -76,3 +76,12 @@ jobs:
           context: ./frontend
           push: true
           tags: ghcr.io/${{ github.repository }}/briefly-frontend:latest
+
+  deploy:
+    needs: [build-and-push]
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy Cluster
+        run: |
+          docker-compose -f docker-compose.distributed.yml up -d --build
