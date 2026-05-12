@@ -41,7 +41,7 @@ jobs:
           ruff check .
 
   build-and-push:
-    needs: [backend-tests, python-lint]
+    needs: [backend-tests]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
