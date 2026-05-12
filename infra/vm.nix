@@ -56,21 +56,6 @@
     gnumake
   ];
 
-  # GitHub Runner Service for Auto-Deploy
-  services.github-runner.briefly-deployer = {
-    enable = true;
-    url = "https://github.com/mina-fady1/Briefly";
-    tokenFile = "/var/lib/github-runner/token";
-    user = "briefly";
-    extraPackages = with pkgs; [
-      docker
-      docker-compose
-      git
-      nodejs_20
-      go
-    ];
-  };
-
   # Tailscale service
   services.tailscale.enable = true;
 
