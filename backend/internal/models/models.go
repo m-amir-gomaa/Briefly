@@ -22,6 +22,17 @@ const (
 	IntakeStatusFailed     IntakeStatus = "FAILED"
 )
 
+type Goal struct {
+	Title  string `json:"title"`
+	Detail string `json:"detail"`
+}
+
+type Ambiguity struct {
+	FieldMissing      string `json:"field_missing"`
+	Reason            string `json:"reason"`
+	SuggestedQuestion string `json:"suggested_question"`
+}
+
 type User struct {
 	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	Email        string    `gorm:"uniqueIndex;not null" json:"email"`

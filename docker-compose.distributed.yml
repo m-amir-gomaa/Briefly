@@ -1,0 +1,110 @@
+version: "3.9"
+
+services:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Node Alpha (Primary Node / Seed)
+  # ────────────────────────────────────────────────────────────────────────────
+  crdb-alpha:
+    image: cockroachdb/cockroach:latest-v23.1
+    container_name: crdb-alpha
+    command: start-single-node --insecure --advertise-addr=crdb-alpha --http-addr=0.0.0.0
+    ports:
+      - "26257:26257"
+      - "26258:26258"
+    volumes:
+      - crdb_alpha_data:/cockroach/cockroach-data
+    healthcheck:
+      test: ["CMD", "/cockroach/cockroach", "node", "status", "--insecure", "--host=crdb-alpha:26257"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis-alpha:
+    image: redis:7-alpine
+    container_name: redis-alpha
+    command: redis-server --save 60 1
+    ports:
+      - "6379:6379"
+
+  minio-alpha:
+    image: minio/minio
+    container_name: minio-alpha
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: briefly_admin
+      MINIO_ROOT_PASSWORD: briefly_storage_secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_alpha_data:/data
+
+  api-alpha:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: api-alpha
+    environment:
+      DATABASE_URL: "postgres://root@crdb-alpha:26257/defaultdb?sslmode=disable"
+      REDIS_URL: "redis://redis-alpha:6379"
+      S3_ENDPOINT: "minio-alpha:9000"
+      S3_ACCESS_KEY: briefly_admin
+      S3_SECRET_KEY: briefly_storage_secret
+      PORT: "8080"
+      WORKER_ID: "node-alpha"
+    ports:
+      - "8082:8080"
+    depends_on:
+      crdb-alpha:
+        condition: service_healthy
+      redis-alpha:
+        condition: service_started
+      minio-alpha:
+        condition: service_started
+
+  worker-alpha:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
+    container_name: worker-alpha
+    environment:
+      REDIS_URL: "redis://redis-alpha:6379"
+      WORKER_ID: "node-alpha"
+    depends_on:
+      - redis-alpha
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Node Beta (Secondary Node - Simulates a Teammate's Laptop)
+  # ────────────────────────────────────────────────────────────────────────────
+  api-beta:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: api-beta
+    environment:
+      DATABASE_URL: "postgres://root@crdb-alpha:26257/defaultdb?sslmode=disable"
+      REDIS_URL: "redis://redis-alpha:6379"
+      S3_ENDPOINT: "minio-alpha:9000"
+      S3_ACCESS_KEY: briefly_admin
+      S3_SECRET_KEY: briefly_storage_secret
+      PORT: "8081"
+      WORKER_ID: "node-beta"
+    ports:
+      - "8081:8081"
+    depends_on:
+      - crdb-alpha
+
+  worker-beta:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
+    container_name: worker-beta
+    environment:
+      REDIS_URL: "redis://redis-alpha:6379"
+      WORKER_ID: "node-beta"
+    depends_on:
+      - redis-alpha
+
+volumes:
+  crdb_alpha_data:
+  minio_alpha_data:

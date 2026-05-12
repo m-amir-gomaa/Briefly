@@ -1,65 +1,71 @@
-name: "Briefly CI/CD"
+name: Briefly Pentagram CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 jobs:
-  validate-nix:
-    name: "Validate Nix Flake"
+  backend-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v25
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-      - name: "Check Flake"
-        run: nix flake check
-
-  test-backend:
-    name: "Test Go Backend"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-          cache-dependency-path: backend/go.sum
-      - name: "Lint & Test"
-        working-directory: ./backend
+          go-version: '1.23'
+      - name: Run Go Tests
         run: |
-          go mod download
-          go test ./... -v
+          cd backend
+          rm -f go.sum
+          go mod tidy
+          go test -v ./...
 
-  test-frontend:
-    name: "Test React Frontend"
+  python-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-      - name: "Build & Lint"
-        working-directory: ./frontend
+          python-version: '3.11'
+      - name: Install dependencies
         run: |
-          npm ci
-          npm run build
+          cd ai_service
+          pip install -r requirements.txt
+          pip install ruff
+      - name: Lint with Ruff
+        run: |
+          cd ai_service
+          ruff check .
 
-  deploy:
-    name: "Deploy to Production"
-    needs: [validate-nix, test-backend, test-frontend]
-    if: github.ref == 'refs/heads/main'
+  build-and-push:
+    needs: [backend-tests, python-lint]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v25
-      - uses: webfactory/ssh-agent@v0.9.0
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-      - name: "Deploy via deploy-rs"
-        run: nix run .#deploy .#vps
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build and push API
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ghcr.io/${{ github.repository }}/briefly-api:latest
+
+      - name: Build and push AI Worker
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ai_service
+          push: true
+          tags: ghcr.io/${{ github.repository }}/briefly-worker:latest

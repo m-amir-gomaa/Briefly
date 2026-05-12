@@ -120,14 +120,19 @@ func UpdateIntakeResults(c *gin.Context) {
 		return
 	}
 
+	goalsJSON, _ := json.Marshal(req.Goals)
+	criteriaJSON, _ := json.Marshal(req.SuccessCriteria)
+	ambiguitiesJSON, _ := json.Marshal(req.Ambiguities)
+	questionsJSON, _ := json.Marshal(req.FollowupQuestions)
+
 	// 2. Create Brief
 	brief := models.Brief{
 		IntakeID:          id,
 		Summary:           req.Summary,
-		Goals:             req.Goals,
-		SuccessCriteria:   req.SuccessCriteria,
-		Ambiguities:       req.Ambiguities,
-		FollowupQuestions: req.FollowupQuestions,
+		Goals:             goalsJSON,
+		SuccessCriteria:   criteriaJSON,
+		Ambiguities:       ambiguitiesJSON,
+		FollowupQuestions: questionsJSON,
 		ToneProfile:       req.ToneProfile,
 		ConfidenceScore:   req.ConfidenceScore,
 	}

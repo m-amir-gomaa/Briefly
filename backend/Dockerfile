@@ -1,13 +1,14 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:alpine AS builder
 
 WORKDIR /app
 
-# Copy go mod and sum files
-COPY go.mod go.sum ./
-RUN go mod download
-
+# Copy go mod file (go.sum deleted to resolve conflicts)
+COPY go.mod ./
 # Copy source code
 COPY . .
+
+# Tidy up dependencies (resolves missing go.sum entries)
+RUN go mod tidy
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/api/main.go

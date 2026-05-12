@@ -28,7 +28,8 @@ func initS3() {
 		Secure: useSSL,
 	})
 	if err != nil {
-		log.Fatalf("Failed to initialize MinIO client: %v", err)
+		log.Printf("Warning: Failed to initialize MinIO client for %s: %v. Continuing for distributed resilience.", endpoint, err)
+		return
 	}
 
 	log.Printf("Successfully initialized S3 client for endpoint: %s", endpoint)

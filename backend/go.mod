@@ -1,9 +1,9 @@
 module github.com/softworks/briefly-backend
 
-go 1.26.2
+go 1.23
 
 require (
-	github.com/gin-gonic/gin v1.12.0
+	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
 	github.com/redis/go-redis/v9 v9.19.0
 	gorm.io/datatypes v1.2.7

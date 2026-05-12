@@ -37,7 +37,7 @@ class Ambiguity(TypedDict):
     suggested_question: str
 
 
-class ShipmentState(TypedDict):
+class IntakeState(TypedDict):
     intake_id: str
     type: str
     raw_text: Optional[str]
@@ -59,12 +59,12 @@ class ShipmentState(TypedDict):
 
 # --- Node Functions ---
 
-async def node_ingest(state: ShipmentState) -> ShipmentState:
+async def node_ingest(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Ingest")
     return state
 
 
-async def node_transcribe(state: ShipmentState) -> ShipmentState:
+async def node_transcribe(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Transcribe")
     if not state.get("audio_url") or "dummy" in state["audio_url"]:
         state["transcription"] = ""
@@ -74,7 +74,7 @@ async def node_transcribe(state: ShipmentState) -> ShipmentState:
     return state
 
 
-async def node_vision(state: ShipmentState) -> ShipmentState:
+async def node_vision(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Vision")
     if not state.get("image_url") or "dummy" in state["image_url"]:
         state["ocr_text"] = ""
@@ -84,8 +84,9 @@ async def node_vision(state: ShipmentState) -> ShipmentState:
     return state
 
 
-
-async def node_transcribe_and_vision(state: ShipmentState) -> ShipmentState:
+# FIX #1: New fan-out node that runs transcribe + vision concurrently so
+# payloads carrying both audio_url and image_url are fully processed.
+async def node_transcribe_and_vision(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Transcribe+Vision (parallel)")
     updated_transcribe, updated_vision = await asyncio.gather(
         node_transcribe(state),
@@ -96,7 +97,7 @@ async def node_transcribe_and_vision(state: ShipmentState) -> ShipmentState:
     return state
 
 
-async def node_merge(state: ShipmentState) -> ShipmentState:
+async def node_merge(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Merge")
     parts = []
     if state.get("raw_text"):
@@ -109,7 +110,7 @@ async def node_merge(state: ShipmentState) -> ShipmentState:
     return state
 
 
-async def node_analyze(state: ShipmentState) -> ShipmentState:
+async def node_analyze(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Analyze")
     prompt = ChatPromptTemplate.from_template("""
     You are a professional logistics consultant. Analyze the intake context and extract a structured brief.
@@ -137,7 +138,7 @@ async def node_analyze(state: ShipmentState) -> ShipmentState:
     return state
 
 
-async def node_ambiguity(state: ShipmentState) -> ShipmentState:
+async def node_ambiguity(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Ambiguity")
     prompt = ChatPromptTemplate.from_template("""
     Review this project summary and goals. Identify missing information or risks.
@@ -163,13 +164,13 @@ async def node_ambiguity(state: ShipmentState) -> ShipmentState:
     return state
 
 
-async def node_tone(state: ShipmentState) -> ShipmentState:
+async def node_tone(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Tone")
     state["tone_profile"] = "startup_casual"
     return state
 
 
-async def node_finalize(state: ShipmentState) -> ShipmentState:
+async def node_finalize(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Finalize")
 
     final_payload = {
@@ -208,7 +209,7 @@ async def node_finalize(state: ShipmentState) -> ShipmentState:
 
 # --- Graph Definition ---
 
-workflow = StateGraph(ShipmentState)
+workflow = StateGraph(IntakeState)
 
 workflow.add_node("ingest", node_ingest)
 workflow.add_node("transcribe_and_vision", node_transcribe_and_vision)
@@ -221,8 +222,9 @@ workflow.add_node("tone", node_tone)
 workflow.add_node("finalize", node_finalize)
 
 
-
-def route_after_ingest(state: ShipmentState) -> str:
+# FIX #1: Router now handles the case where both audio and image are
+# provided, routing to the combined parallel node instead of dropping one.
+def route_after_ingest(state: IntakeState) -> str:
     has_audio = bool(state.get("audio_url"))
     has_image = bool(state.get("image_url"))
     if has_audio and has_image:
@@ -271,7 +273,7 @@ async def run_pipeline(payload: dict):
         except Exception as e:
             print(f"[{payload['intake_id']}] Pre-flight check error: {e}")
 
-    state = ShipmentState(
+    state = IntakeState(
         intake_id=payload["intake_id"],
         type=payload["type"],
         raw_text=payload.get("raw_text"),

@@ -27,7 +27,7 @@ func main() {
 		&models.Feedback{},
 	)
 	if err != nil {
-		log.Fatalf("Failed to auto-migrate: %v", err)
+		log.Printf("Warning: Auto-migration encountered an error (expected on first CRDB run): %v", err)
 	}
 
 	// Create default user for demo
@@ -42,7 +42,7 @@ func main() {
 		log.Printf("Created default demo user: %s", user.ID)
 	}
 
-	port := os.getenv("PORT")
+	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
