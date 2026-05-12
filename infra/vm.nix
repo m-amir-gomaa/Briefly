@@ -50,7 +50,7 @@
     # Development Toolchain
     nodejs_20
     go
-    python311
+    python3
     jq
     gh
     gnumake
