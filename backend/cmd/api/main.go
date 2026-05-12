@@ -12,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/softworks/briefly-backend/internal/db"
 	"github.com/softworks/briefly-backend/internal/handlers"
-	"github.com/softworks/briefly-backend/internal/middleware"
 	"github.com/softworks/briefly-backend/internal/models"
 )
 
@@ -21,7 +20,6 @@ func main() {
 	db.Init()
 
 	// Auto-migrate models (Note: In production, rely on migrations instead)
-	/*
 	err := db.DB.AutoMigrate(
 		&models.User{},
 		&models.Intake{},
@@ -31,7 +29,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate: %v", err)
 	}
-	*/
 
 	// Create default user for demo
 	var user models.User
@@ -45,48 +42,21 @@ func main() {
 		log.Printf("Created default demo user: %s", user.ID)
 	}
 
-	port := os.Getenv("PORT")
+	port := os.getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
+
 	r := gin.Default()
-	
-	// Permissive CORS for development (As per architectural fix)
-	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	})
-
-	// Static files (for uploaded media)
-	// Ensure the directory exists
-	if _, err := os.Stat("/uploads"); os.IsNotExist(err) {
-		os.MkdirAll("/uploads", 0755)
-	}
-	r.Static("/uploads", "/uploads")
 
 	// Global Middleware
 	r.Use(gin.Recovery())
 	r.Use(gin.Logger())
 
-	// IP Rate Limiter (5 requests per minute per IP)
-	// This replaces the missing Cloudflare WAF in the $0 setup.
-	limiter := middleware.NewIPRateLimiter(5.0/60.0, 5)
-	r.Use(middleware.RateLimitMiddleware(limiter))
-
-	// Auth routes
-	r.POST("/api/v1/login", handlers.Login)
+	// CORS or other middleware would be added here
 
 	// API v1 group
 	v1 := r.Group("/api/v1")
-	v1.Use(middleware.AuthMiddleware())
 	{
 		// Intake routes
 		v1.POST("/intake", handlers.SubmitIntake)
@@ -106,25 +76,6 @@ func main() {
 		Addr:    ":" + port,
 		Handler: r,
 	}
-
-	// Start Redis Completion Worker (As per Architecture Spec)
-	go func() {
-		log.Println("Started Redis worker polling 'intake:results'...")
-		for {
-			result, err := db.Redis.BRPop(db.Ctx, 0, "intake:results").Result()
-			if err != nil {
-				log.Printf("Redis BRPop Error: %v", err)
-				time.Sleep(time.Second)
-				continue
-			}
-			
-			if len(result) > 1 {
-				log.Printf("Received result from AI for intake")
-				// We call a new internal processing function
-				handlers.ProcessAIResult(result[1])
-			}
-		}
-	}()
 
 	// Initializing the server in a goroutine so that
 	// it won't block the graceful shutdown handling below

@@ -2,13 +2,13 @@
 
 ## Role Summary
 You are building the "Brain Stem" of the platform. You connect the Frontend to the Postgres Database and the Redis Queue. 
-**Tech Stack**: Go 1.22, Gin, GORM, Postgres (`pgvector`), Redis.
+**Tech Stack**: Go 1.22, Gin, GORM, Postgres (`pgvector`), Redis, `quic-go`.
 
 ## 1. Concurrency & Performance
 We are operating under a strict limit of 250 RPS on an Oracle ARM VPS.
 *   **GOGC**: The environment will run with `GOGC=200` to trade RAM for lower CPU latency. Ensure you don't introduce massive memory leaks (e.g., loading 50MB files into memory).
 *   **Streaming**: For large audio files (25MB), you MUST generate a Cloudflare R2 Pre-Signed URL. Do not proxy the binary data through Go.
-*   **Streaming**: Utilize high-performance Server-Sent Events (SSE) to provide zero-stutter updates to the Vite frontend. Ensure headers are set correctly to disable proxy buffering.
+*   **WebTransport**: Utilize `quic-go` to establish HTTP/3 WebTransport streams for zero-stutter updates to the Next.js frontend, maintaining SSE as a fallback.
 
 ## 2. Database (GORM, JSONB, pgvector)
 The AI outputs are schema-less JSON. We use Postgres `JSONB` to store them.
@@ -32,4 +32,4 @@ When you want an AI to build a handler, paste this exact prompt:
 > *"Write a Gin handler for POST /api/v1/intake. Follow the Briefly Backend Cookbook: The handler must parse a JSON body, generate a UUID, save it to GORM with Context propagation, and LPUSH the JSON payload to the 'intake:queue' list in Redis."*
 
 ## 5. Review & Ship
-Verify the handler has no race conditions and respects Context Cancellation. Ensure the JSON payload pushed to Redis perfectly matches the `IntakeState` typed dict in Python.
+Verify the handler has no race conditions and respects Context Cancellation. Ensure the JSON payload pushed to Redis perfectly matches the `ShipmentState` typed dict in Python.

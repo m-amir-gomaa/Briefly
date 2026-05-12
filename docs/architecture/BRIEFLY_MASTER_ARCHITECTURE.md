@@ -20,7 +20,7 @@ These figures are derived from our target load of 250 Requests Per Second (RPS) 
 ### Functional Requirements (FR)
 - **FR-1: Multi-Modal Ingestion**: Support raw text, .mp3/.wav audio, and .jpg/.png screenshots in a single project intake.
 - **FR-2: Agentic Synthesis**: Utilize a 7-node LangGraph pipeline to extract goals, success criteria, and ambiguities.
-- **FR-3: Real-Time Status**: Stream pipeline progress to the Agency Dashboard via high-performance Server-Sent Events (SSE).
+- **FR-3: Real-Time Status**: Stream pipeline progress to the Agency Dashboard via WebTransport/SSE.
 - **FR-4: Living Document**: Generate a shareable, zero-auth URL for clients to view and "Sign Off" on the brief.
 - **FR-5: Feedback Loop**: Allow clients to comment on specific extracted goals, triggering a re-generation.
 
@@ -63,7 +63,7 @@ The Briefly repository is structured as a **Monorepo**.
 aisprint/
 ├── ai_service/             # 🧠 The Python AI Worker (LangGraph / FastAPI)
 ├── backend/                # 🚀 The Go High-Concurrency API (Gin / GORM)
-├── frontend/               # 🌐 The Vite-powered User Interface (Tailwind / Zustand)
+├── frontend/               # 🌐 The Next.js User Interface (Tailwind / Zustand)
 ├── infra/                  # 🏗️ Infrastructure & Deployment (Nginx / sops-nix)
 ├── cookbooks/              # 📖 Developer Guidelines (Source of Truth)
 ├── docs/                   # 🗺️ Architectural Blueprints
@@ -103,34 +103,30 @@ flowchart TB
     Browser -- "HTTPS /api/*" --> CF_WAF
     Browser -- "Pre-Signed Uploads" --> R2
 
-    %% Private Workspace Layer
-    subgraph Host_Laptop [Private Host Laptop]
-        subgraph Personal_Space [Personal Files & Apps]
-            Sensitive_Data["🔑 Personal Passwords / Docs"]
+    %% Infrastructure Layer (NixOS VPS)
+    subgraph VPS_Tier [NixOS VPS Infrastructure]
+
+        subgraph Ingress [Ingress & Reverse Proxy]
+            Nginx["📦 Nginx (HTTP/3 + WebTransport)"]
+            Local_LB["🔀 Nginx Round-Robin Balancer"]
         end
-        
-        %% Isolation Barrier
-        subgraph Hypervisor [Isolation Layer (KVM / VirtualBox)]
-            %% Project Infrastructure (Local Laptop VM)
-            subgraph VM_Tier [Project Control Center]
-                
-                subgraph Ingress [Ingress & Reverse Proxy]
-                    Tunnel["🚇 Cloudflare Quick Tunnel"]
-                    Nginx["📦 Nginx"]
-                end
 
-                subgraph Application_Tier [Application Tier]
-                    Go_API["🚀 Go API"]
-                    Py_Worker["🧠 AI Worker"]
-                end
-
-                subgraph Data_Tier [Persistence & Storage]
-                    Redis[("⚡ Redis")]
-                    PG[("🐘 PostgreSQL")]
-                    Local_S3[("📦 Local MinIO")]
-                end
+        subgraph Application_Tier [Application Tier]
+            Go_1["🚀 Go API (Container 1)"]
+            Go_2["🚀 Go API (Container 2)"]
+            
+            subgraph Python_Cluster [Python Worker Cluster]
+                Py_1["🧠 Python Worker 1 (LangGraph)"]
+                Py_2["🧠 Python Worker 2 (LangGraph)"]
             end
         end
+
+        subgraph Data_Tier [Persistence & Caching Tier]
+            Redis[("⚡ Redis (PubSub + Read-Through Cache)")]
+            PG[("🐘 PostgreSQL (ACID + JSONB)")]
+            Vector[("🧮 pgvector (RAG / Memory)")]
+        end
+
     end
 
     %% External Intelligence Layer
@@ -139,18 +135,30 @@ flowchart TB
     end
     
     %% Ingress Flow
-    Browser -- "HTTPS" --> Tunnel
-    Tunnel -- "Proxy Pass" --> Nginx
-    Nginx -- "API Request" --> Go_API
+    CF_WAF -- "Proxy Pass" --> Nginx
+    Nginx -- "Load Balance" --> Local_LB
+    Local_LB -- "API Request" --> Go_1
+    Local_LB -- "API Request" --> Go_2
     
+    %% Real-time Streams
+    Nginx -. "WebTransport Stream (proxy_buffering off)" .-> Browser
+
     %% Go Backend Flow
-    Go_API -- "Job Queue" --> Redis
-    Go_API -- "GORM" --> PG
+    Go_1 -- "Read/Write Cache" --> Redis
+    Go_2 -- "Read/Write Cache" --> Redis
+    Go_1 -- "LPUSH (Job Queue)" --> Redis
+    Go_2 -- "LPUSH (Job Queue)" --> Redis
+    Go_1 -- "GORM (Context-aware)" --> PG
+    Go_2 -- "GORM (Context-aware)" --> PG
 
     %% Python Worker Flow
-    Redis -- "Consume Job" --> Py_Worker
-    Py_Worker -- "Process" --> Gemini
-    Py_Worker -- "Save Media" --> Local_S3
+    Redis -- "BRPOP (Consume Job)" --> Python_Cluster
+    Python_Cluster -- "Event Publish" --> Redis
+    
+    %% AI Interactions
+    Python_Cluster -- "Semantic Cache Check" --> Vector
+    Python_Cluster -- "Async Processing" --> Gemini
+    Python_Cluster -- "Write Brief Result" --> PG
 ```
 
 ---
@@ -161,9 +169,9 @@ flowchart TB
 We explicitly separate fast I/O traffic (handled by Go) from slow, heavy CPU compute (handled by Python). They do not communicate via HTTP. Instead, they use a **Publish/Subscribe & Queuing** pattern via Redis (`LPUSH`/`BRPOP`). This guarantees the Go API never crashes even if the AI takes 60 seconds to process audio.
 
 ### B. The Multi-Layer Caching Subsystem
-*   **Edge Caching (`CF_CDN`)**: Stores static HTML/JS/CSS assets optimized by Vite. 
-*   **Read-Through Cache (`Redis`)**: [Phase 2] The Go API is designed to query Redis for frequent operations (like viewing public briefs) before hitting Postgres.
-*   **Semantic LLM Cache (`pgvector`)**: [Phase 2] Before sending massive prompts to Gemini, Python workers will generate an embedding. If similarity >99%, the worker returns the cached state.
+*   **Edge Caching (`CF_CDN`)**: Stores static HTML/JS/CSS bundles generated by Next.js. 
+*   **Read-Through Cache (`Redis`)**: The Go API queries Redis for frequent operations (like viewing public briefs) before hitting Postgres.
+*   **Semantic LLM Cache (`pgvector`)**: Before sending massive prompts to Gemini, Python workers generate a quick embedding of the input. If `pgvector` contains an embedding with >99% cosine similarity, the worker returns the cached state instantly.
 
 ### C. State Machine (DAG) Pattern
 LangGraph enforces a strict Directed Acyclic Graph (DAG) for the AI. This allows for **Parallel Fan-Out** (e.g., transcribing audio and scanning images simultaneously on two different async threads) to cut processing time in half.
@@ -239,18 +247,18 @@ stateDiagram-v2
 ```
 
 ### C. End-to-End Behavioral Flow (Sequence Diagram)
-The lifecycle of a single brief, from user interaction to real-time SSE updates.
+The lifecycle of a single brief, from user interaction to real-time WebTransport streaming.
 
 ```mermaid
 sequenceDiagram
-    participant C as Client (Vite)
+    participant C as Client (Next.js)
     participant A as Go API (Gin)
     participant R as Redis (Queue)
     participant W as Python Worker
     
     C->>A: POST /api/v1/intake (Metadata)
     A->>C: 202 Accepted {intake_id, upload_url}
-    C->>A: GET /api/v1/events/{id} (SSE Connection)
+    C->>A: GET /api/v1/events/{id} (WebTransport / SSE Connection)
     A-->>C: event: connected
     
     C->>A: POST /api/v1/intake/confirm
@@ -259,14 +267,11 @@ sequenceDiagram
     W->>W: Run LangGraph Nodes (Parallel)
     W->>R: PUBLISH event:intake:{id} "NODE_TRANSCRIBE_DONE"
     R-->>A: Received Event
-    A-->>C: SSE Event: NODE_TRANSCRIBE_DONE
+    A-->>C: WebTransport Datagram: NODE_TRANSCRIBE_DONE
     
     W->>W: Finalize
-    W->>R: RPUSH intake:results {brief_payload}
-    R->>A: BRPop intake:results
-    A->>A: GORM: Create Brief
-    A->>R: PUBLISH event:intake:{id} "COMPLETED"
-    A-->>C: SSE Event: COMPLETED
+    W->>R: PUBLISH event:intake:{id} "COMPLETED"
+    A-->>C: WebTransport Datagram: COMPLETED
 ```
 
 ---
@@ -282,7 +287,7 @@ Detailed port mapping and security boundary definition.
 | Protocol | Source | Destination | Component | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
 | **HTTPS** | External | CF_WAF | Firewall | DDoS Protection & Rate Limiting |
-| **HTTP/2** | CF_WAF | Nginx:443 | Entry Point | Optimized for SSE Streams |
+| **HTTP/3** | CF_WAF | Nginx:443 | Entry Point | UDP Streaming (WebTransport) |
 | **HTTP** | Nginx | Go_API:8080 | Reverse Proxy | API Routing & Load Balancing |
 | **TCP** | Go_API | Postgres:5432 | Database | Persistence & pgvector |
 | **TCP** | Go_API | Redis:6379 | PubSub/Queue | Read-Through Cache / Messaging |

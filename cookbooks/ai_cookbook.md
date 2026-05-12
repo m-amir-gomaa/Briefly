@@ -1,19 +1,19 @@
 # Briefly AI Cookbook: Python/LangGraph
 
 ## Role Summary
-You are building the heavy computational engine. You receive jobs from Redis, run them through an LLM state machine, and push results back to Redis.
+You are building the heavy computational engine. You receive jobs from Redis, run them through an LLM state machine, and update the Go API.
 **Tech Stack**: Python 3.11, FastAPI (for worker process), LangGraph, Google Gemini 1.5 Flash.
 
 ## 1. The Queue & Idempotency
 You run a persistent `while True` loop calling `redis_client.brpop("intake:queue", timeout=0)`.
-*   **Idempotency Check**: Before spending tokens on Gemini, check Redis for a 'processing' lock on the `intake_id`. If it's already marked as completed in the global state, drop the job. 
+*   **Idempotency Check**: Before spending tokens on Gemini, you MUST do an HTTP GET to the Go API to check if the `intake_id` is already `COMPLETED`. If it is, drop the job. 
 
 ## 2. The LangGraph State Machine
 We use a **Fan-Out/Fan-In** architecture.
 *   `node_transcribe` (Audio) and `node_vision` (Image OCR) must run in parallel using `asyncio.gather()`. 
-*   **State Isolation**: The `IntakeState` TypedDict must be instantiated locally inside the queue loop. NEVER use global variables.
-*   **Semantic Caching**: [Future] Before sending large extraction prompts to Gemini, embed the prompt and query `pgvector`. 
-*   **Long-Term Memory (RAG)**: [Future] Use the `Embedding` field in the Postgres Briefs table for historical context.
+*   **State Isolation**: The `ShipmentState` TypedDict must be instantiated locally inside the queue loop. NEVER use global variables.
+*   **Semantic Caching**: Before sending large extraction prompts to Gemini, embed the prompt. Query `pgvector` using Cosine Similarity. If a match > 99% exists, return the cached result immediately to save time and API costs.
+*   **Long-Term Memory (RAG)**: For project management queries, use `pgvector` to pull historical brief context into the Gemini prompt.
 
 ## 3. Resilience & Security
 *   **Circuit Breaker**: If Gemini returns 3 consecutive `429` errors, you must automatically route the LLM call to the local Ollama instance (`http://localhost:11434`).

@@ -1,22 +1,10 @@
 fastapi==0.110.1
 uvicorn==0.29.0
-<<<<<<< HEAD
-langgraph>=0.0.31
-langchain-core>=0.1.40
-langchain-google-genai
-google-generativeai
-=======
 langgraph==0.0.31
-langchain-core==0.1.45
+langchain-core==0.1.40
 langchain-google-genai==1.0.3
 google-generativeai==0.5.2
->>>>>>> 43ee518 (feat: standardize dev environment and finalize team onboarding)
 redis==5.0.3
 pydantic==2.6.4
 python-dotenv==1.0.1
 requests==2.31.0
-<<<<<<< HEAD
-httpx
-=======
-typing-extensions==4.10.0
->>>>>>> 43ee518 (feat: standardize dev environment and finalize team onboarding)
