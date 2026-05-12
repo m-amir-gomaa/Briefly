@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/minio/minio-go/v7"
 	"github.com/softworks/briefly-backend/internal/db"
 	"github.com/softworks/briefly-backend/internal/models"
 )
@@ -40,14 +41,32 @@ func SubmitIntake(c *gin.Context) {
 		Status:  models.IntakeStatusPending,
 	}
 
-	// 1. Upload files to R2 (placeholder logic)
-	// file, header, err := c.Request.FormFile("audio_file")
-	// if err == nil {
-	//   url := services.UploadToR2(file, header.Filename)
-	//   intake.AudioURL = url
-	// }
+	// 1. Upload files to MinIO
+	audioFile, audioHeader, err := c.Request.FormFile("audio_file")
+	if err == nil {
+		defer audioFile.Close()
+		key := uuid.New().String() + "-" + audioHeader.Filename
+		_, err = db.S3.PutObject(c, db.GetBucketName(), key, audioFile, audioHeader.Size, minio.PutObjectOptions{
+			ContentType: audioHeader.Header.Get("Content-Type"),
+		})
+		if err == nil {
+			intake.AudioURL = key
+		}
+	}
 
-	// 2. Save to Postgres
+	imageFile, imageHeader, err := c.Request.FormFile("image_file")
+	if err == nil {
+		defer imageFile.Close()
+		key := uuid.New().String() + "-" + imageHeader.Filename
+		_, err = db.S3.PutObject(c, db.GetBucketName(), key, imageFile, imageHeader.Size, minio.PutObjectOptions{
+			ContentType: imageHeader.Header.Get("Content-Type"),
+		})
+		if err == nil {
+			intake.ImageURL = key
+		}
+	}
+
+	// 2. Save to CockroachDB
 	if err := db.DB.Create(&intake).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save intake"})
 		return

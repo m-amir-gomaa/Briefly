@@ -55,3 +55,11 @@ func initS3() {
 		}
 	}
 }
+
+func GetBucketName() string {
+	bn := os.Getenv("S3_BUCKET")
+	if bn == "" {
+		return "briefly-intake"
+	}
+	return bn
+}

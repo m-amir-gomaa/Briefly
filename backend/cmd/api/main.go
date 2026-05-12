@@ -19,15 +19,24 @@ func main() {
 	// Initialize database and Redis
 	db.Init()
 
-	// Auto-migrate models (Note: In production, rely on migrations instead)
-	err := db.DB.AutoMigrate(
+	// Auto-migrate models individually (CRDB best practice)
+	migrateModels := []interface{}{
 		&models.User{},
 		&models.Intake{},
 		&models.Brief{},
 		&models.Feedback{},
-	)
-	if err != nil {
-		log.Printf("Warning: Auto-migration encountered an error (expected on first CRDB run): %v", err)
+	}
+
+	for _, model := range migrateModels {
+		// Retry a few times if CRDB is still waking up
+		for i := 0; i < 3; i++ {
+			err := db.DB.AutoMigrate(model)
+			if err == nil {
+				break
+			}
+			log.Printf("Migration warning for %T (retry %d): %v", model, i+1, err)
+			time.Sleep(2 * time.Second)
+		}
 	}
 
 	// Create default user for demo
