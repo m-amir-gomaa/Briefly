@@ -1,15 +1,24 @@
 # Briefly Team Onboarding Guide
 
-Welcome to the team! This guide will help you set up the Briefly platform on your machine and join our private development mesh.
+Welcome to the team! This guide will get you from zero to a running node in the **Pentagram** distributed mesh.
+
+---
 
 ## 1. Prerequisites
-You must have **Nix** installed. If you don't, run:
+
+You must have the following installed on your machine:
+- **Nix** (for the reproducible dev shell)
+- **Docker** + **Docker Compose** v2
+- **Tailscale** (for the private mesh)
+
+Install Nix if you don't have it:
 ```bash
 curl -L https://nixos.org/nix/install | sh
 ```
 
-## 2. Standardize Your Environment
-Clone the repository and enter the development shell. This will automatically install all necessary tools (Go, Node, Python, Docker, etc.) for this project only.
+---
+
+## 2. Clone & Enter the Dev Shell
 
 ```bash
 git clone https://github.com/mina-fady1/Briefly.git
@@ -17,45 +26,120 @@ cd Briefly
 nix develop
 ```
 
-## 3. Join the Private Mesh (Tailscale)
-We use Tailscale to connect our laptops securely without touching router settings.
+This gives you the exact versions of Go 1.23, Python 3.11, Node, and all tools locked in `flake.nix`. No version conflicts, no "works on my machine."
 
-1.  **Install Tailscale**: `sudo pkgs.tailscale` (or download from tailscale.com).
-2.  **Log in**: `sudo tailscale up`.
-3.  **Ask the Lead**: Give your "Tailscale IP" (found via `tailscale ip -4`) to the Team Lead.
+---
 
-## 4. Setting up the Virtual Machine
-We run the platform in an isolated NixOS VM to keep your host machine clean.
+## 3. Configure Your Environment
 
 ```bash
-# Start the VM (Headless)
-nix-shell infra/vm.nix
+cp .env.example .env
 ```
 
-The VM will start and map the following ports to your local machine:
-*   `localhost:9999` -> The Website/API
-*   `localhost:2223` -> SSH access to the VM
+Edit `.env` and fill in:
 
-## 5. Giving the Team Lead Access
-To allow the Team Lead to help you debug or scale, they need SSH access to your VM.
+| Variable | Description |
+|---|---|
+| `GOOGLE_API_KEY` | Your Gemini 1.5 Flash API key |
+| `NODE_IP` | Your Tailscale IP (see step 4) |
+| `DATABASE_URL` | CockroachDB URL (Alpha node provides this) |
+| `REDIS_URL` | Redis node URL (Alpha node provides this) |
+| `REDIS_CLUSTER_MODE` | `false` for local dev, `true` for multi-node |
 
-1.  **Enable SSH Forwarding**:
-    Ensure your Tailscale is up.
-2.  **Provide SSH Command**:
-    Your teammates can now connect to your VM via:
-    ```bash
-    ssh -p 2223 briefly@<YOUR-TAILSCALE-IP>
-    ```
+---
 
-## 6. Running the Stack
-Once inside the VM (or from your host if you have Docker installed):
+## 4. Join the Private Mesh (Tailscale)
+
+We use Tailscale to connect all 5 laptops without touching router settings.
+
 ```bash
-cd Briefly
-docker-compose up -d --build
+# Install and authenticate
+sudo tailscale up
+
+# Get your node IP
+tailscale ip -4
+```
+
+Share your Tailscale IP with the Team Lead. They will confirm when you appear in the mesh.
+
+---
+
+## 5. Launch the Stack
+
+**Single-machine (local dev):**
+```bash
+docker compose up -d --build
+```
+
+**Distributed (joining the Pentagram mesh):**
+```bash
+docker compose -f docker-compose.distributed.yml up -d --build
+```
+
+Services and ports:
+
+| Service | Port | Description |
+|---|---|---|
+| `api-alpha` | `8080` | Go REST API (primary) |
+| `api-beta` | `8081` | Go REST API (secondary) |
+| `worker-alpha` | `8001` | Python AI worker |
+| `frontend` | `3000` | Vite dev server |
+| `crdb-alpha` | `26257` | CockroachDB SQL |
+| `crdb-alpha` | `26258` | CockroachDB Console UI |
+| `redis-alpha` | `6379` | Redis |
+| `minio-alpha` | `9000/9001` | MinIO (S3-compatible storage) |
+
+---
+
+## 6. Verify Your Node is Healthy
+
+```bash
+# Check all containers are running
+docker compose -f docker-compose.distributed.yml ps
+
+# Check Go API logs
+docker logs api-alpha --tail 30
+
+# Check AI worker logs
+docker logs worker-alpha --tail 30
+
+# Check CockroachDB cluster health
+open http://localhost:26258
+```
+
+The AI worker is healthy when you see:
+```
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001
+```
+
+The Go API is healthy when you see routes registered:
+```
+[GIN-debug] POST   /api/v1/intake
+[GIN-debug] GET    /api/v1/events/:intake_id
 ```
 
 ---
 
-### **Troubleshooting**
-*   **"Nginx 404"**: Ensure the `frontend` container is finished building (`docker ps`).
-*   **"Connection Refused"**: Check if the VM is actually running (`pgrep qemu`).
+## 7. Know Your Cookbooks
+
+Before writing any code, read your team role's cookbook:
+
+| Role | Cookbook |
+|---|---|
+| Frontend | `cookbooks/frontend_cookbook.md` — Vite + React + Zustand |
+| Backend | `cookbooks/backend_cookbook.md` — Go + Gin + CockroachDB |
+| AI/ML | `cookbooks/ai_cookbook.md` — Python + LangGraph + Gemini |
+| DevOps | `cookbooks/devops_cookbook.md` — NixOS + Docker + Tailscale |
+
+---
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `go mod download` fails at build | `rm backend/go.sum && docker compose build` — the Dockerfile runs `go mod tidy` |
+| Worker crashes with `NameError` | Make sure all state references use `IntakeState`, not `ShipmentState` |
+| API can't reach DB | Check `DATABASE_URL` in `.env` points to the Alpha node's CockroachDB |
+| SSE events not streaming | Check Nginx has `proxy_buffering off` on the `/events/` location block |
+| Git LFS hook errors | `rm -f .git/hooks/post-checkout` then re-run the git command |

@@ -1,63 +1,37 @@
-import { create } from 'zustand'
-import {
-  getIntake,
-  submitIntake as submitIntakeRequest,
-  type IntakeRecord,
-} from '../services/api'
-
-type IntakeFlowStatus = 'IDLE' | 'UPLOADING' | 'PROCESSING' | 'COMPLETED' | 'ERROR'
-type DashboardStatus = 'IDLE' | 'LOADING' | 'READY' | 'ERROR'
-
-const HISTORY_KEY = 'briefly:intake-history'
-const HISTORY_LIMIT = 24
-
-let activeEventSource: EventSource | null = null
-
-function readHistory(): string[] {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
-    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : []
-  } catch {
-    return []
-  }
-}
-
-function writeHistory(ids: string[]) {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(ids.slice(0, HISTORY_LIMIT)))
-}
-
-function upsertIntake(records: IntakeRecord[], next: IntakeRecord) {
-  const existing = records.filter((record) => record.id !== next.id)
-  return [next, ...existing].sort((a, b) => {
-    const aTime = new Date(a.created_at || a.updated_at).getTime()
-    const bTime = new Date(b.created_at || b.updated_at).getTime()
-    return bTime - aTime
-  })
-}
+import { create } from 'zustand';
+import { getIntake, submitIntake as apiSubmitIntake, type IntakeRecord } from '../services/api';
 
 interface IntakeState {
-  rawText: string
-  hasAudio: boolean
-  hasImage: boolean
-  status: IntakeFlowStatus
-  dashboardStatus: DashboardStatus
-  currentIntakeId: string | null
-  currentIntake: IntakeRecord | null
-  intakes: IntakeRecord[]
-  trackedIds: string[]
-  errorMessage: string | null
-  eventMessage: string | null
+  // --- UI State ---
+  rawText: string;
+  hasAudio: boolean;
+  hasImage: boolean;
+  status: 'IDLE' | 'UPLOADING' | 'PROCESSING' | 'COMPLETED' | 'ERROR';
+  dashboardStatus: 'IDLE' | 'LOADING' | 'ERROR';
+  errorMessage: string | null;
+  eventMessage: string | null;
+  
+  // --- Data State ---
+  intakes: IntakeRecord[];
+  currentIntakeId: string | null;
+  currentIntake: IntakeRecord | null;
 
-  setRawText: (text: string) => void
-  setHasAudio: (value: boolean) => void
-  setHasImage: (value: boolean) => void
-  submitIntake: (audioBlob: Blob | null, imageFile: File | null) => Promise<void>
-  subscribeToEvents: (id: string) => void
-  fetchIntake: (id: string) => Promise<IntakeRecord | null>
-  refreshTrackedIntakes: () => Promise<void>
-  trackIntake: (id: string) => void
-  reset: () => void
+  // --- Actions ---
+  setRawText: (text: string) => void;
+  setHasAudio: (val: boolean) => void;
+  setHasImage: (val: boolean) => void;
+  setMediaStatus: (audio: boolean, image: boolean) => void;
+  setStatus: (status: 'IDLE' | 'UPLOADING' | 'PROCESSING' | 'COMPLETED' | 'ERROR') => void;
+  setIntakeId: (id: string | null) => void;
+  
+  refreshTrackedIntakes: () => Promise<void>;
+  fetchIntake: (id: string) => Promise<IntakeRecord | null>;
+  submitIntake: (audioBlob: Blob | null, imageFile: File | null) => Promise<void>;
+  subscribeToEvents: (id: string) => void;
+  reset: () => void;
 }
+
+const API_BASE = '/api/v1';
 
 export const useIntakeStore = create<IntakeState>((set, get) => ({
   rawText: '',
@@ -65,175 +39,110 @@ export const useIntakeStore = create<IntakeState>((set, get) => ({
   hasImage: false,
   status: 'IDLE',
   dashboardStatus: 'IDLE',
-  currentIntakeId: null,
-  currentIntake: null,
-  intakes: [],
-  trackedIds: readHistory(),
   errorMessage: null,
   eventMessage: null,
+  
+  intakes: [],
+  currentIntakeId: null,
+  currentIntake: null,
 
-  setRawText: (text: string) => set({ rawText: text }),
-  setHasAudio: (value: boolean) => set({ hasAudio: value }),
-  setHasImage: (value: boolean) => set({ hasImage: value }),
-
-  trackIntake: (id: string) => {
-    const ids = [id, ...get().trackedIds.filter((trackedId) => trackedId !== id)]
-    const limited = ids.slice(0, HISTORY_LIMIT)
-    writeHistory(limited)
-    set({ trackedIds: limited })
-  },
-
-  fetchIntake: async (id: string) => {
-    try {
-      const intake = await getIntake(id)
-
-      set((state) => ({
-        intakes: upsertIntake(state.intakes, intake),
-        currentIntake: intake,
-        currentIntakeId: id,
-      }))
-
-      return intake
-    } catch (error) {
-      set({
-        errorMessage: error instanceof Error ? error.message : 'Unable to load intake',
-      })
-      return null
-    }
-  },
-
+  setRawText: (text) => set({ rawText: text }),
+  setHasAudio: (hasAudio) => set({ hasAudio }),
+  setHasImage: (hasImage) => set({ hasImage }),
+  setMediaStatus: (audio, image) => set({ hasAudio: audio, hasImage: image }),
+  setStatus: (status) => set({ status }),
+  setIntakeId: (id) => set({ currentIntakeId: id }),
+  
   refreshTrackedIntakes: async () => {
-    const ids = get().trackedIds
+    set({ dashboardStatus: 'LOADING' });
+    try {
+      const trackedIds = JSON.parse(localStorage.getItem('briefly_tracked_intakes') || '[]');
+      if (trackedIds.length === 0) {
+        set({ intakes: [], dashboardStatus: 'IDLE' });
+        return;
+      }
 
-    if (!ids.length) {
-      set({ dashboardStatus: 'READY', intakes: [] })
-      return
+      const results = await Promise.allSettled(
+        trackedIds.map((id: string) => getIntake(id))
+      );
+
+      const successfulIntakes = results
+        .filter((r): r is PromiseFulfilledResult<IntakeRecord> => r.status === 'fulfilled')
+        .map(r => r.value)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      set({ intakes: successfulIntakes, dashboardStatus: 'IDLE' });
+    } catch (error) {
+      console.error('Failed to refresh intakes:', error);
+      set({ dashboardStatus: 'ERROR' });
     }
-
-    set({ dashboardStatus: 'LOADING', errorMessage: null })
-
-    const results = await Promise.all(ids.map((id) => getIntake(id).catch(() => null)))
-    const records = results.filter((record): record is IntakeRecord => Boolean(record))
-    const validIds = records.map((record) => record.id)
-
-    writeHistory(validIds)
-
-    set({
-      intakes: records.sort((a, b) => {
-        const aTime = new Date(a.created_at || a.updated_at).getTime()
-        const bTime = new Date(b.created_at || b.updated_at).getTime()
-        return bTime - aTime
-      }),
-      trackedIds: validIds,
-      dashboardStatus: 'READY',
-    })
   },
 
-  submitIntake: async (audioBlob: Blob | null, imageFile: File | null) => {
-    const { rawText } = get()
+  fetchIntake: async (id) => {
+    try {
+      const intake = await getIntake(id);
+      set({ currentIntake: intake });
+      return intake;
+    } catch (error) {
+      console.error('Failed to fetch intake:', error);
+      return null;
+    }
+  },
 
-    if (!rawText.trim() && !audioBlob && !imageFile) return
-
-    set({
-      status: 'UPLOADING',
-      currentIntakeId: null,
-      currentIntake: null,
-      errorMessage: null,
-      eventMessage: null,
-    })
+  submitIntake: async (audioBlob, imageFile) => {
+    const { rawText } = get();
+    set({ status: 'UPLOADING', errorMessage: null, eventMessage: null });
 
     try {
-      const data = await submitIntakeRequest({ rawText, audioBlob, imageFile })
-      const intakeId = data.intake_id
+      const data = await apiSubmitIntake({
+        rawText,
+        audioBlob,
+        imageFile,
+      });
 
-      get().trackIntake(intakeId)
+      set({ currentIntakeId: data.intake_id, status: 'PROCESSING' });
+      
+      const tracked = JSON.parse(localStorage.getItem('briefly_tracked_intakes') || '[]');
+      localStorage.setItem('briefly_tracked_intakes', JSON.stringify([...new Set([data.intake_id, ...tracked])]));
 
-      set({
-        status: 'PROCESSING',
-        currentIntakeId: intakeId,
-        eventMessage: 'Connected to the processing stream.',
-      })
-
-      await get().fetchIntake(intakeId)
-      get().subscribeToEvents(intakeId)
+      get().subscribeToEvents(data.intake_id);
     } catch (error) {
-      set({
-        status: 'ERROR',
-        errorMessage: error instanceof Error ? error.message : 'Unable to submit intake',
-      })
+      console.error(error);
+      set({ status: 'ERROR', errorMessage: error instanceof Error ? error.message : 'Unknown error' });
     }
   },
 
-  subscribeToEvents: (id: string) => {
-    activeEventSource?.close()
-
-    const eventSource = new EventSource(`/api/v1/events/${id}`)
-    activeEventSource = eventSource
-
-    eventSource.onmessage = async (event) => {
-      const message = String(event.data || '').trim().toUpperCase()
-
-      if (message === 'COMPLETED') {
-        const intake = await get().fetchIntake(id)
-        set({
-          status: 'COMPLETED',
-          currentIntake: intake,
-          eventMessage: 'Brief generated and ready for review.',
-        })
-        eventSource.close()
-        activeEventSource = null
-        return
-      }
-
-      if (message === 'FAILED') {
-        await get().fetchIntake(id)
-        set({
-          status: 'ERROR',
-          errorMessage: 'The AI worker could not complete this intake.',
-        })
-        eventSource.close()
-        activeEventSource = null
-      }
-    }
-
-    eventSource.onerror = async () => {
-      const intake = await get().fetchIntake(id)
-
-      if (intake?.status === 'COMPLETED') {
-        set({
-          status: 'COMPLETED',
-          currentIntake: intake,
-          eventMessage: 'Brief generated and ready for review.',
-        })
-      } else if (intake?.status === 'FAILED') {
-        set({
-          status: 'ERROR',
-          errorMessage: 'The AI worker could not complete this intake.',
-        })
+  subscribeToEvents: (id) => {
+    const eventSource = new EventSource(`${API_BASE}/events/${id}`);
+    
+    eventSource.onmessage = (event) => {
+      console.log('SSE Event:', event.data);
+      if (event.data === 'COMPLETED' || event.data === 'FAILED') {
+        set({ status: event.data === 'COMPLETED' ? 'COMPLETED' : 'ERROR' });
+        if (event.data === 'FAILED') set({ errorMessage: 'AI processing failed' });
+        void get().refreshTrackedIntakes(); 
+        void get().fetchIntake(id); 
+        eventSource.close();
       } else {
-        set({
-          eventMessage: 'Processing is still running. Refresh this intake if the stream times out.',
-        })
+        set({ eventMessage: event.data });
       }
+    };
 
-      eventSource.close()
-      activeEventSource = null
-    }
+    eventSource.onerror = (err) => {
+      console.error('SSE Error:', err);
+      set({ status: 'ERROR', errorMessage: 'Lost connection to update stream' });
+      eventSource.close();
+    };
   },
 
-  reset: () => {
-    activeEventSource?.close()
-    activeEventSource = null
-
-    set({
-      rawText: '',
-      hasAudio: false,
-      hasImage: false,
-      status: 'IDLE',
-      currentIntakeId: null,
-      currentIntake: null,
-      errorMessage: null,
-      eventMessage: null,
-    })
-  },
-}))
+  reset: () => set({
+    rawText: '',
+    hasAudio: false,
+    hasImage: false,
+    status: 'IDLE',
+    currentIntakeId: null,
+    currentIntake: null,
+    errorMessage: null,
+    eventMessage: null
+  })
+}));
