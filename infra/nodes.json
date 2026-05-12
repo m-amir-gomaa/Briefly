@@ -1,0 +1,24 @@
+# nodes.json — Briefly Cluster Node Registry
+# 
+# Edit this file to reflect the actual laptops available for your session.
+# You do NOT need all nodes present. 2 nodes is enough to run the platform.
+#
+# Fields:
+#   name        — unique identifier, used as the Colmena host key and hostname
+#   tailscaleIP — the node's Tailscale IP (run `tailscale ip -4` on each machine)
+#   role        — "lead" (one per cluster, runs CRDB seed) or "worker"
+#
+# The node marked "lead" MUST be the first to come online.
+# All "worker" nodes connect to the lead's CockroachDB and Redis.
+[
+  {
+    "name": "laptop-alpha",
+    "tailscaleIP": "100.x.x.x",
+    "role": "lead"
+  },
+  {
+    "name": "laptop-beta",
+    "tailscaleIP": "100.x.x.x",
+    "role": "worker"
+  }
+]
