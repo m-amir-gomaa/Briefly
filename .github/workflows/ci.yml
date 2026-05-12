@@ -61,18 +61,18 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: ghcr.io/${{ github.repository }}/briefly-api:latest
+          tags: ghcr.io/mina-fady1/briefly-api:latest
 
       - name: Build and push AI Worker
         uses: docker/build-push-action@v5
         with:
           context: ./ai_service
           push: true
-          tags: ghcr.io/${{ github.repository }}/briefly-worker:latest
+          tags: ghcr.io/mina-fady1/briefly-worker:latest
 
       - name: Build and push Frontend
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
           push: true
-          tags: ghcr.io/${{ github.repository }}/briefly-frontend:latest
+          tags: ghcr.io/mina-fady1/briefly-frontend:latest
