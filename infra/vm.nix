@@ -37,7 +37,7 @@
     ];
   };
 
-  # Packages needed inside the VM
+  # Packages needed inside the VM for development and production
   environment.systemPackages = with pkgs; [
     git
     vim
@@ -46,6 +46,14 @@
     docker-compose
     cloudflared # For the tunnel
     tailscale   # To join the mesh
+    
+    # Development Toolchain
+    nodejs_20
+    go
+    python311
+    jq
+    gh
+    gnumake
   ];
 
   # Tailscale service

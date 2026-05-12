@@ -105,6 +105,16 @@ services:
     depends_on:
       - redis-alpha
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: briefly-ui
+    ports:
+      - "80:80"
+    depends_on:
+      - api-alpha
+
 volumes:
   crdb_alpha_data:
   minio_alpha_data:
