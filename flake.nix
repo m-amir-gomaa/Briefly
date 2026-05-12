@@ -26,7 +26,7 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             # Core Languages
-            go_1_23
+            go
             nodejs_20
             python311
             
