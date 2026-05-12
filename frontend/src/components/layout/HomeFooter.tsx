@@ -5,6 +5,7 @@ interface HomeFooterProps {
 }
 
 const productLinks = [
+  { label: 'Pricing', path: '/pricing' },
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'New Intake', path: '/intake/new' },
   { label: 'Account', path: '/account' },
@@ -16,11 +17,11 @@ const resourceLinks = [
   { label: 'API Documentation', href: '#' },
 ]
 
-const companyLinks = [
-  { label: 'About', href: '#' },
+const companyLinks: { label: string; href?: string; path?: string }[] = [
+  { label: 'About', path: '/about' },
   { label: 'Blog', href: '#' },
   { label: 'Careers', href: '#' },
-  { label: 'Contact', href: '#' },
+  { label: 'Contact', path: '/contact' },
 ]
 
 const socialLinks = [
@@ -119,12 +120,22 @@ export default function HomeFooter({ onNavigate }: HomeFooterProps) {
             <ul className="mt-4 space-y-3">
               {companyLinks.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-zinc-500 transition-colors duration-200 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100"
-                  >
-                    {link.label}
-                  </a>
+                  {link.path ? (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate(link.path!)}
+                      className="text-sm text-zinc-500 transition-colors duration-200 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100"
+                    >
+                      {link.label}
+                    </button>
+                  ) : (
+                    <a
+                      href={link.href}
+                      className="text-sm text-zinc-500 transition-colors duration-200 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100"
+                    >
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
@@ -139,15 +150,15 @@ export default function HomeFooter({ onNavigate }: HomeFooterProps) {
             &copy; {currentYear} Briefly. All rights reserved.
           </p>
           <div className="flex items-center gap-5">
-            <a href="#" className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600">
+            <button type="button" onClick={() => onNavigate('/privacy')} className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600">
               Privacy Policy
-            </a>
-            <a href="#" className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600">
+            </button>
+            <button type="button" onClick={() => onNavigate('/terms')} className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600">
               Terms of Service
-            </a>
-            <a href="#" className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600">
+            </button>
+            <button type="button" onClick={() => onNavigate('/privacy')} className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600">
               Cookies
-            </a>
+            </button>
           </div>
         </div>
       </div>

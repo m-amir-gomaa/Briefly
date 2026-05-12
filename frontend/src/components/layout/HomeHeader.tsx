@@ -29,8 +29,18 @@ export default function HomeHeader({ onNavigate }: HomeHeaderProps) {
   const [featuresOpen, setFeaturesOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(getInitialDarkMode)
+  const [isScrolled, setIsScrolled] = useState(false)
   const featuresRef = useRef<HTMLDivElement>(null)
   const accountRef = useRef<HTMLDivElement>(null)
+
+  // Handle scroll for transparent header
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   // Apply dark mode class to document
   useEffect(() => {
@@ -56,9 +66,15 @@ export default function HomeHeader({ onNavigate }: HomeHeaderProps) {
   const userInitial = (user?.agencyName || user?.email || 'U').slice(0, 1).toUpperCase()
 
   return (
-    <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/90 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-950/90">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
-        {/* Left side — Logo + Navigation */}
+    <header 
+      className={`sticky top-0 z-50 transition-all duration-300 ${
+        isScrolled 
+          ? 'border-b border-zinc-200 bg-white/20 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-950/20' 
+          : 'border-b border-transparent bg-transparent dark:border-transparent dark:bg-transparent'
+      }`}
+    >
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
+        {/* Left side — Logo */}
         <div className="flex items-center gap-1">
           {/* Logo */}
           <button
@@ -74,15 +90,26 @@ export default function HomeHeader({ onNavigate }: HomeHeaderProps) {
               draggable={false}
             />
           </button>
+        </div>
 
+        {/* Right side — Navigation + Actions */}
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Navigation */}
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Home navigation">
+          <nav className="hidden items-center gap-1 md:flex mr-2" aria-label="Home navigation">
             <button
               type="button"
               onClick={() => onNavigate('/')}
-              className="rounded-lg px-3.5 py-2 text-sm font-semibold text-zinc-950 transition-all duration-200 ease-in-out hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              className="rounded-full px-3.5 py-2 text-sm font-semibold text-zinc-950 transition-all duration-200 ease-in-out hover:bg-zinc-100/50 dark:text-zinc-100 dark:hover:bg-zinc-800/50"
             >
               Home
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => onNavigate('/pricing')}
+              className="rounded-full px-3.5 py-2 text-sm font-semibold text-zinc-950 transition-all duration-200 ease-in-out hover:bg-zinc-100/50 dark:text-zinc-100 dark:hover:bg-zinc-800/50"
+            >
+              Pricing
             </button>
 
             {/* Features dropdown */}
@@ -91,10 +118,10 @@ export default function HomeHeader({ onNavigate }: HomeHeaderProps) {
                 type="button"
                 onClick={() => setFeaturesOpen(!featuresOpen)}
                 className={[
-                  'inline-flex items-center gap-1 rounded-lg px-3.5 py-2 text-sm font-semibold transition-all duration-200 ease-in-out',
+                  'inline-flex items-center gap-1 rounded-full px-3.5 py-2 text-sm font-semibold transition-all duration-200 ease-in-out',
                   featuresOpen
-                    ? 'bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-zinc-100'
-                    : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100',
+                    ? 'bg-zinc-100/50 text-zinc-950 dark:bg-zinc-800/50 dark:text-zinc-100'
+                    : 'text-zinc-600 hover:bg-zinc-100/50 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-100',
                 ].join(' ')}
               >
                 Features
@@ -134,10 +161,7 @@ export default function HomeHeader({ onNavigate }: HomeHeaderProps) {
               )}
             </div>
           </nav>
-        </div>
 
-        {/* Right side — Dark mode toggle + Account */}
-        <div className="flex items-center gap-2">
           {/* Dark mode toggle */}
           <button
             type="button"

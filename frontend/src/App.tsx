@@ -8,6 +8,11 @@ import ForgotPasswordView from './views/ForgotPassword'
 import IntakeView from './views/Intake'
 import IntakeDetailView from './views/IntakeDetail'
 import PublicBriefView from './views/PublicBrief'
+import PricingView from './views/Pricing'
+import AboutView from './views/About'
+import ContactView from './views/Contact'
+import PrivacyView from './views/Privacy'
+import TermsView from './views/Terms'
 import { useAuthStore } from './store/useAuthStore'
 
 function publicTokenFromPath(path: string) {
@@ -41,6 +46,26 @@ function App() {
 
   if (path === '/forgot-password') {
     return <ForgotPasswordView onNavigate={navigate} />
+  }
+
+  if (path === '/pricing') {
+    return <PricingView onNavigate={navigate} />
+  }
+
+  if (path === '/about') {
+    return <AboutView onNavigate={navigate} />
+  }
+
+  if (path === '/contact') {
+    return <ContactView onNavigate={navigate} />
+  }
+
+  if (path === '/privacy') {
+    return <PrivacyView onNavigate={navigate} />
+  }
+
+  if (path === '/terms') {
+    return <TermsView onNavigate={navigate} />
   }
 
   if (path === '/login' || (!isAuthenticated && path !== '/register')) {

@@ -181,7 +181,7 @@ export default function FeatureShowcase() {
 
                   <div className="flex items-center justify-between pt-2">
                     <div className="h-2.5 w-20 rounded-full bg-zinc-100 dark:bg-zinc-800" />
-                    <div className="h-7 w-20 rounded-md bg-zinc-950 dark:bg-zinc-100" />
+                    <div className="h-7 w-20 rounded-full bg-zinc-950 dark:bg-zinc-100" />
                   </div>
                 </div>
               </motion.div>

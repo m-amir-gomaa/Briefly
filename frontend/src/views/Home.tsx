@@ -132,7 +132,7 @@ export default function HomeView({ onNavigate }: HomeViewProps) {
 
                   <div className="flex items-center justify-between pt-2">
                     <div className="h-2.5 w-20 rounded-full bg-zinc-100 dark:bg-zinc-800" />
-                    <div className="h-7 w-20 rounded-md bg-zinc-950 dark:bg-zinc-100" />
+                    <div className="h-7 w-20 rounded-full bg-zinc-950 dark:bg-zinc-100" />
                   </div>
                 </div>
               </div>
@@ -140,28 +140,65 @@ export default function HomeView({ onNavigate }: HomeViewProps) {
           </motion.div>
         </section>
 
-        <FeatureShowcase />
+        <motion.section
+          className="mt-20 flex flex-col items-center text-center sm:mt-28"
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false, amount: 0.3 }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+        >
+          <h2 className="max-w-4xl text-4xl font-bold tracking-tight text-zinc-950 sm:text-6xl dark:text-zinc-50">
+            Less time organizing.<br />
+            <span className="text-zinc-400 dark:text-zinc-500">More time creating.</span>
+          </h2>
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-600 dark:text-zinc-400">
+            Briefly acts as your intelligent partner. From the very first client meeting to the final approved scope, it ensures no detail is lost in translation. Stop wrestling with disjointed notes and focus on delivering brilliant work.
+          </p>
+        </motion.section>
+
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false, amount: 0.1 }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+        >
+          <FeatureShowcase />
+        </motion.div>
 
         <section id="workflow" className="mt-24 sm:mt-32">
-          <div className="mb-5">
+          <motion.div
+            className="mb-8"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.5 }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          >
             <p className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">Workflow</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-normal text-zinc-950 sm:text-3xl dark:text-zinc-50">
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-950 sm:text-4xl dark:text-zinc-50">
               The same operating rhythm as the workspace.
             </h2>
-          </div>
+          </motion.div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {workflowItems.map((item) => {
+          <div className="grid gap-6 md:grid-cols-3">
+            {workflowItems.map((item, index) => {
               const Icon = item.icon
 
               return (
-                <Card key={item.title}>
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <h3 className="mt-5 text-base font-semibold text-zinc-950 dark:text-zinc-100">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{item.description}</p>
-                </Card>
+                <motion.div
+                  key={item.title}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: false, amount: 0.2 }}
+                  transition={{ duration: 0.6, delay: index * 0.15, ease: 'easeOut' }}
+                >
+                  <Card className="h-full border border-zinc-200/50 bg-white/50 backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-zinc-200/50 dark:border-zinc-800/50 dark:bg-zinc-900/50 dark:hover:shadow-black/50">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                      <Icon className="h-6 w-6" />
+                    </span>
+                    <h3 className="mt-6 text-lg font-semibold text-zinc-950 dark:text-zinc-100">{item.title}</h3>
+                    <p className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{item.description}</p>
+                  </Card>
+                </motion.div>
               )
             })}
           </div>
