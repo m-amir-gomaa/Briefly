@@ -47,15 +47,11 @@ class ShipmentState(TypedDict):
     ocr_text: Optional[str]
     unified_context: str
     summary: str
-    # FIX #3: All list fields that node_analyze populates are now Optional
-    # so a partial failure doesn't leave the state in an invalid shape.
     goals: Optional[List[Goal]]
     success_criteria: Optional[List[str]]
     constraints: Optional[List[str]]
     ambiguities: Optional[List[Ambiguity]]
     followup_questions: Optional[List[str]]
-    # FIX #7: Removed dead fields evidence_map and cot_log. Re-add them
-    # only when the nodes that populate them are actually implemented.
     confidence_score: float
     tone_profile: str
     retry_count: int
@@ -88,8 +84,7 @@ async def node_vision(state: ShipmentState) -> ShipmentState:
     return state
 
 
-# FIX #1: New fan-out node that runs transcribe + vision concurrently so
-# payloads carrying both audio_url and image_url are fully processed.
+
 async def node_transcribe_and_vision(state: ShipmentState) -> ShipmentState:
     print(f"[{state['intake_id']}] Node Transcribe+Vision (parallel)")
     updated_transcribe, updated_vision = await asyncio.gather(
@@ -134,8 +129,6 @@ async def node_analyze(state: ShipmentState) -> ShipmentState:
         state["success_criteria"] = res.get("success_criteria", [])
         state["constraints"] = res.get("constraints", [])
     except Exception as e:
-        # FIX #3: Explicitly set all fields to safe defaults on failure so
-        # downstream nodes never encounter missing keys.
         print(f"[{state['intake_id']}] Extraction Error: {e}")
         state["summary"] = "Error during AI analysis."
         state["goals"] = []
@@ -164,8 +157,6 @@ async def node_ambiguity(state: ShipmentState) -> ShipmentState:
         state["ambiguities"] = res.get("ambiguities", [])
         state["followup_questions"] = res.get("followup_questions", [])
     except Exception as e:
-        # FIX #2: Replaced bare `except: pass` with a logged except that
-        # still guarantees safe defaults are written to state.
         print(f"[{state['intake_id']}] Ambiguity Error: {e}")
         state["ambiguities"] = []
         state["followup_questions"] = []
@@ -188,8 +179,6 @@ async def node_finalize(state: ShipmentState) -> ShipmentState:
         "ambiguities": state["ambiguities"],
         "followup_questions": state["followup_questions"],
         "tone_profile": state["tone_profile"],
-        # FIX #4: Use the actual confidence_score from state instead of
-        # the hardcoded literal 0.9 that was masking the real value.
         "confidence_score": state.get("confidence_score", 0.0),
         "is_confirmed": False,
     }
@@ -200,8 +189,6 @@ async def node_finalize(state: ShipmentState) -> ShipmentState:
             resp = await client.patch(url, json=final_payload)
             if resp.status_code == 200:
                 print(f"[{state['intake_id']}] Successfully updated backend.")
-                # FIX #5: Redis client is opened and explicitly closed here
-                # rather than leaking a module-level connection.
                 redis_client = await get_redis_client()
                 try:
                     await redis_client.publish(
@@ -224,8 +211,6 @@ async def node_finalize(state: ShipmentState) -> ShipmentState:
 workflow = StateGraph(ShipmentState)
 
 workflow.add_node("ingest", node_ingest)
-# FIX #1: Replaced the two separate single-modal nodes with one parallel
-# node that handles audio+image simultaneously when both are present.
 workflow.add_node("transcribe_and_vision", node_transcribe_and_vision)
 workflow.add_node("transcribe", node_transcribe)
 workflow.add_node("vision", node_vision)
@@ -236,8 +221,7 @@ workflow.add_node("tone", node_tone)
 workflow.add_node("finalize", node_finalize)
 
 
-# FIX #1: Router now handles the case where both audio and image are
-# provided, routing to the combined parallel node instead of dropping one.
+
 def route_after_ingest(state: ShipmentState) -> str:
     has_audio = bool(state.get("audio_url"))
     has_image = bool(state.get("image_url"))
@@ -277,8 +261,6 @@ async def run_pipeline(payload: dict):
                 data = resp.json()
                 if data.get("status") == "COMPLETED":
                     return
-            # FIX #6: Treat unexpected non-200/404 responses as hard errors
-            # rather than silently falling through and duplicating work.
             elif resp.status_code != 404:
                 raise RuntimeError(
                     f"Unexpected status {resp.status_code} while checking "
