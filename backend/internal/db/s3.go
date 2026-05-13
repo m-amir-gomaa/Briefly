@@ -37,7 +37,7 @@ func initS3() {
 	// Ensure bucket exists
 	bucketName := os.Getenv("S3_BUCKET")
 	if bucketName == "" {
-		bucketName = "briefly-media"
+		bucketName = "briefly-intake"
 	}
 
 	exists, err := S3.BucketExists(context.Background(), bucketName)

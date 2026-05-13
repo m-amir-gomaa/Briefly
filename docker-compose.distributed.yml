@@ -63,6 +63,7 @@ services:
       S3_ENDPOINT: "${PRIMARY_NODE_IP:-minio-alpha}:9000"
       S3_ACCESS_KEY: briefly_admin
       S3_SECRET_KEY: briefly_storage_secret
+      S3_BUCKET: "briefly-intake"
       BRIEFLY_DEMO_GEMINI_API_KEY: "${BRIEFLY_DEMO_GEMINI_API_KEY}"
       PORT: "8080"
       WORKER_ID: "node-alpha"
@@ -145,9 +146,22 @@ services:
     image: ghcr.io/m-amir-gomaa/briefly-frontend:latest
     container_name: briefly-ui
     ports:
-      - "80:80"
+      - "6568:80"
+    # network_mode: host removed to use the open firewall port 6568
     depends_on:
       - api-alpha
+
+  nginx:
+    image: nginx:alpine
+    container_name: briefly-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/nginx.distributed.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-alpha
+      - frontend
 
   watchtower:
     image: containrrr/watchtower

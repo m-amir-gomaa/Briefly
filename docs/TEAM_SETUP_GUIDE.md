@@ -75,9 +75,13 @@ Once Tailscale is up and you are in the `nix develop` shell:
     # See your local services
     docker ps
     
-    # Check if you can see the cluster
-    curl http://<ALPHA_IP>:26258/health
+    # Check if you can hit the Alpha node's proxy
+    curl http://<ALPHA_IP>:80/api/v1/health
     ```
+
+    > **For non-technical team members / UI testing on phones**:
+    > You can bypass the local setup and just visit the public Tailscale Funnel link:
+    > `https://briefly-vm.tail0c7099.ts.net/`
 
 ---
 

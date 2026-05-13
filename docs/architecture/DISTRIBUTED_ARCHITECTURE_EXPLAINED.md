@@ -22,7 +22,9 @@ For session management and task queuing, we deploy a **Redis Cluster**.
 The system decouples the **I/O-heavy API layer** from the **compute-heavy AI layer**.
 
 ### The Go API (Ingress Layer)
-The backend is a stateless Go service designed for horizontal scalability. It handles multi-part form parsing (for audio/image uploads) and immediately offloads the processing to the Redis queue. Real-time updates are pushed back to the client via **Server-Sent Events (SSE)**, with the API layer acting as a PubSub consumer listening for completion events on Redis.
+The backend is a stateless Go service designed for horizontal scalability. It handles multi-part form parsing (for audio/image uploads) and immediately offloads the processing to the Redis queue. 
+- **The Nginx Gateway**: All incoming traffic (including public UI testing via **Tailscale Funnel**) is caught by a unified Nginx Reverse Proxy on Port 80, which securely routes `/api/` traffic to the Go backend and `/` traffic to the Vite frontend.
+- **Real-time Updates**: Real-time updates are pushed back to the client via **Server-Sent Events (SSE)**, with the API layer acting as a PubSub consumer listening for completion events on Redis.
 
 ### The Python Worker (AI Execution Layer)
 The AI pipeline, pinned to the stable `c7c545e` revision, utilizes **LangGraph** to execute a Directed Acyclic Graph (DAG) of processing nodes.

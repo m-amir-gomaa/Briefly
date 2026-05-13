@@ -26,17 +26,13 @@ Welcome to the **Pentagram**. We are running a 5-node distributed mesh (Alpha, B
    Check if your node appears in the CockroachDB console at `http://<ALPHA_IP>:26258`.
 
 ## 4. Components
-### 🚀 Backend (Go)
-The backend is running V0.4 logic with Pentagram distributed patches. It handles multi-node connection pooling to CockroachDB and distributed Redis.
-- Port: `8080`
+### 🚀 Backend & Frontend (Nginx Gateway)
+All services are now consolidated behind a unified Nginx reverse proxy. You no longer need to access different ports.
+- **Port**: `80` (Proxies `/api/` to Go Backend, and `/` to Vite Frontend).
 
 ### 🧠 AI Service (Python)
 Pinned to commit `c7c545e09a4e6b43fe9b2dbc69b83bd06eac570b`. This version includes advanced LangGraph "FIX"es and is aligned with the `Intake` terminology.
-- Port: `8001`
-
-### 🌐 Frontend (Vite)
-Stable V0.4 frontend. Your friend should use this as the base for all UI changes.
-- Port: `3000`
+- Internal Port: `8001`
 
 ## 5. Troubleshooting
 - **Terminology**: If the worker fails with a `NameError` related to `ShipmentState`, ensure you have the latest terminology alignment patch (use `IntakeState`).
