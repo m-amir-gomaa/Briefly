@@ -35,7 +35,7 @@ type Ambiguity struct {
 
 type User struct {
 	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Email        string    `gorm:"index:idx_user_email,unique;not null" json:"email"`
+	Email        string    `gorm:"uniqueIndex;not null" json:"email"`
 	AgencyName   string    `json:"agency_name"`
 	PasswordHash string    `json:"-"`
 	GeminiAPIKey string    `json:"-"` // Hidden from JSON
