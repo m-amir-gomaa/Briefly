@@ -22,6 +22,12 @@ You are building the \"Brain Stem\" of the platform: a stateless, high-concurren
 
 ### Schema (models.go — exact field names)
 ```go
+type User struct {
+    ID           uuid.UUID
+    Email        string
+    GeminiAPIKey string // Used to route jobs to the correct AI profile
+}
+
 type Intake struct {
     ID       uuid.UUID    `gorm:"type:uuid;default:gen_random_uuid()"`
     UserID   uuid.UUID
@@ -63,12 +69,13 @@ type Ambiguity struct { FieldMissing string `json:"field_missing"`; Reason strin
 When an intake is saved by `POST /api/v1/intake`, push a job to the `intake:queue` list:
 ```go
 payload, _ := json.Marshal(map[string]interface{}{
-    "intake_id":   intake.ID,
-    "type":        intake.Type,
-    "audio_url":   intake.AudioURL,
-    "image_url":   intake.ImageURL,
-    "raw_text":    intake.RawText,
-    "enqueued_at": time.Now().Format(time.RFC3339),
+    "intake_id":      intake.ID,
+    "type":           intake.Type,
+    "audio_url":      intake.AudioURL,
+    "image_url":      intake.ImageURL,
+    "raw_text":       intake.RawText,
+    "gemini_api_key": user.GeminiAPIKey, // Injected into the AI state
+    "enqueued_at":    time.Now().Format(time.RFC3339),
 })
 db.Redis.LPush(db.Ctx, "intake:queue", payload)
 ```

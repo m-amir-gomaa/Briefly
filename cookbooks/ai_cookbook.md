@@ -31,6 +31,7 @@ class IntakeState(TypedDict):
     confidence_score: float
     tone_profile: str
     retry_count: int
+    gemini_api_key: Optional[str]      # Injected from user profile
 ```
 
 **Key rule**: All list fields are `Optional`. Nodes MUST always write safe defaults (`[]`) on failure. Never leave a field in an undefined state.
@@ -110,11 +111,15 @@ finally:
 
 ## 5. Gemini Integration
 ```python
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
-    temperature=0.1,
-    google_api_key=os.getenv("GOOGLE_API_KEY", "dummy")
-)
+# Per-request initialization (already handled in orchestrator.py)
+def get_llm(api_key: str = None):
+    return ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        temperature=0.1,
+        google_api_key=api_key or os.getenv("GOOGLE_API_KEY")
+    )
+
+llm = get_llm(state.get("gemini_api_key"))
 chain = prompt | llm | JsonOutputParser()
 res = await chain.ainvoke({"context": state["unified_context"]})
 ```
