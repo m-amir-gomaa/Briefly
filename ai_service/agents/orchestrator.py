@@ -23,7 +23,8 @@ def get_llm(api_key: str = None):
     return ChatGoogleGenerativeAI(
         model="gemini-1.5-flash",
         temperature=0.1,
-        google_api_key=key
+        google_api_key=key,
+        model_kwargs={"response_mime_type": "application/json"}
     )
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -183,22 +184,28 @@ async def node_merge(state: IntakeState) -> IntakeState:
 
 async def node_analyze(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Analyze")
+    parser = JsonOutputParser()
     prompt = ChatPromptTemplate.from_template("""
     You are Briefly AI, a professional project consultant. 
     Analyze the context provided and extract a structured project brief.
     
     CONTEXT: {context}
 
-    Return JSON with:
+    {format_instructions}
+    
+    Ensure your output is ONLY valid JSON containing the following keys:
     - summary: 2-sentence executive summary.
     - goals: list of objects with 'title' (short) and 'detail' (1 sentence).
     - success_criteria: list of 3 specific KPIs.
     - constraints: list of 3 budget/time/technical constraints.
     """)
     llm = get_llm(state.get("gemini_api_key"))
-    chain = prompt | llm | JsonOutputParser()
+    chain = prompt | llm | parser
     try:
-        res = await chain.ainvoke({"context": state["unified_context"]})
+        res = await chain.ainvoke({
+            "context": state["unified_context"],
+            "format_instructions": parser.get_format_instructions()
+        })
         state["summary"] = res.get("summary", "No summary generated.")
         state["goals"] = res.get("goals", [])
         state["success_criteria"] = res.get("success_criteria", [])
@@ -210,21 +217,25 @@ async def node_analyze(state: IntakeState) -> IntakeState:
 
 async def node_ambiguity(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Ambiguity Review")
+    parser = JsonOutputParser()
     prompt = ChatPromptTemplate.from_template("""
     Review the project summary and goals. Identify missing information or potential risks.
     SUMMARY: {summary}
     GOALS: {goals}
 
-    Return JSON with:
+    {format_instructions}
+    
+    Ensure your output is ONLY valid JSON containing the following keys:
     - ambiguities: list of objects with 'field_missing', 'reason', 'suggested_question'.
     - followup_questions: list of 3 strings for the user.
     """)
     llm = get_llm(state.get("gemini_api_key"))
-    chain = prompt | llm | JsonOutputParser()
+    chain = prompt | llm | parser
     try:
         res = await chain.ainvoke({
             "summary": state["summary"],
-            "goals": json.dumps(state["goals"])
+            "goals": json.dumps(state["goals"]),
+            "format_instructions": parser.get_format_instructions()
         })
         state["ambiguities"] = res.get("ambiguities", [])
         state["followup_questions"] = res.get("followup_questions", [])

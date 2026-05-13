@@ -1,0 +1,23 @@
+:80 {
+    # Increase maximum body size for file uploads
+    request_body {
+        max_size 25MB
+    }
+
+    # SSE Stream - must disable buffering
+    handle /api/v1/events/* {
+        reverse_proxy http://api-alpha:8080 {
+            flush_interval -1
+        }
+    }
+    
+    # API Routes
+    handle /api/* {
+        reverse_proxy http://api-alpha:8080
+    }
+    
+    # Frontend Routes
+    handle /* {
+        reverse_proxy http://briefly-ui:80
+    }
+}

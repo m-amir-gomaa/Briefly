@@ -151,14 +151,14 @@ services:
     depends_on:
       - api-alpha
 
-  nginx:
-    image: nginx:alpine
-    container_name: briefly-nginx
+  caddy:
+    image: caddy:alpine
+    container_name: briefly-caddy
     restart: unless-stopped
     ports:
       - "80:80"
     volumes:
-      - ./infra/nginx/nginx.distributed.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - api-alpha
       - frontend
