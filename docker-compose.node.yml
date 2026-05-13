@@ -3,9 +3,7 @@ version: "3.9"
 services:
   # The API instance for this node
   api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/m-amir-gomaa/briefly-api:latest
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
@@ -19,9 +17,7 @@ services:
 
   # The AI Worker instance for this node
   worker:
-    build:
-      context: ./ai_service
-      dockerfile: Dockerfile
+    image: ghcr.io/m-amir-gomaa/briefly-worker:latest
     environment:
       REDIS_URL: ${REDIS_URL}
       WORKER_ID: ${NODE_NAME:-node-unknown}

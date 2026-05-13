@@ -21,7 +21,7 @@ curl -L https://nixos.org/nix/install | sh
 ## 2. Clone & Enter the Dev Shell
 
 ```bash
-git clone https://github.com/mina-fady1/Briefly.git
+git clone https://github.com/m-amir-gomaa/Briefly.git
 cd Briefly
 nix develop
 ```

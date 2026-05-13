@@ -40,7 +40,7 @@ services:
       - minio_alpha_data:/data
 
   api-alpha:
-    image: ghcr.io/mina-fady1/briefly-api:latest
+    image: ghcr.io/m-amir-gomaa/briefly-api:latest
     container_name: api-alpha
     environment:
       DATABASE_URL: "postgres://root@crdb-alpha:26257/defaultdb?sslmode=disable"
@@ -61,7 +61,7 @@ services:
         condition: service_started
 
   worker-alpha:
-    image: ghcr.io/mina-fady1/briefly-worker:latest
+    image: ghcr.io/m-amir-gomaa/briefly-worker:latest
     container_name: worker-alpha
     environment:
       REDIS_URL: "redis://redis-alpha:6379"
@@ -73,7 +73,7 @@ services:
   # Node Beta (Secondary Node - Simulates a Teammate's Laptop)
   # ────────────────────────────────────────────────────────────────────────────
   api-beta:
-    image: ghcr.io/mina-fady1/briefly-api:latest
+    image: ghcr.io/m-amir-gomaa/briefly-api:latest
     container_name: api-beta
     environment:
       DATABASE_URL: "postgres://root@crdb-alpha:26257/defaultdb?sslmode=disable"
@@ -89,7 +89,7 @@ services:
       - crdb-alpha
 
   worker-beta:
-    image: ghcr.io/mina-fady1/briefly-worker:latest
+    image: ghcr.io/m-amir-gomaa/briefly-worker:latest
     container_name: worker-beta
     environment:
       REDIS_URL: "redis://redis-alpha:6379"
@@ -98,7 +98,7 @@ services:
       - redis-alpha
 
   frontend:
-    image: ghcr.io/mina-fady1/briefly-frontend:latest
+    image: ghcr.io/m-amir-gomaa/briefly-frontend:latest
     container_name: briefly-ui
     ports:
       - "80:80"
@@ -110,6 +110,7 @@ services:
     container_name: briefly-watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.docker/config.json:/config.json:ro
     command: --interval 60 --cleanup
     restart: always
 
