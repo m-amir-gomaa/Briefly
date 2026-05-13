@@ -25,6 +25,12 @@ services:
     command: redis-server --save 60 1
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   minio-alpha:
     image: minio/minio
@@ -36,10 +42,19 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
     volumes:
       - minio_alpha_data:/data
 
   api-alpha:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     image: ghcr.io/m-amir-gomaa/briefly-api:latest
     container_name: api-alpha
     environment:
@@ -62,6 +77,9 @@ services:
         condition: service_started
 
   worker-alpha:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
     image: ghcr.io/m-amir-gomaa/briefly-worker:latest
     container_name: worker-alpha
     environment:
@@ -79,6 +97,9 @@ services:
   # Node Beta (Secondary Node - Simulates a Teammate's Laptop)
   # ────────────────────────────────────────────────────────────────────────────
   api-beta:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     image: ghcr.io/m-amir-gomaa/briefly-api:latest
     container_name: api-beta
     environment:
@@ -93,9 +114,18 @@ services:
     ports:
       - "8081:8081"
     depends_on:
-      - crdb-alpha
+      crdb-alpha:
+        condition: service_healthy
+      redis-alpha:
+        condition: service_healthy
+      minio-alpha:
+        condition: service_healthy
+    restart: unless-stopped
 
   worker-beta:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
     image: ghcr.io/m-amir-gomaa/briefly-worker:latest
     container_name: worker-beta
     environment:
@@ -107,7 +137,9 @@ services:
       S3_ACCESS_KEY: "briefly_admin"
       S3_SECRET_KEY: "briefly_storage_secret"
     depends_on:
-      - redis-alpha
+      redis-alpha:
+        condition: service_healthy
+    restart: unless-stopped
 
   frontend:
     image: ghcr.io/m-amir-gomaa/briefly-frontend:latest

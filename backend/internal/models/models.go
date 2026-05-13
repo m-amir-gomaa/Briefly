@@ -35,7 +35,7 @@ type Ambiguity struct {
 
 type User struct {
 	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Email        string    `gorm:"uniqueIndex;not null" json:"email"`
+	Email        string    `gorm:"index:idx_user_email,unique;not null" json:"email"`
 	AgencyName   string    `json:"agency_name"`
 	PasswordHash string    `json:"-"`
 	GeminiAPIKey string    `json:"-"` // Hidden from JSON
@@ -46,11 +46,11 @@ type User struct {
 type Intake struct {
 	ID        uuid.UUID    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	UserID    uuid.UUID    `gorm:"type:uuid;not null;index" json:"user_id"`
-	Type      IntakeType   `gorm:"type:intake_type;default:'TEXT';not null" json:"type"`
+	Type      IntakeType   `gorm:"type:text;default:'TEXT';not null" json:"type"`
 	RawText   string       `json:"raw_text"`
 	AudioURL  string       `json:"audio_url"`
 	ImageURL  string       `json:"image_url"`
-	Status    IntakeStatus `gorm:"type:intake_status;default:'PENDING';not null;index" json:"status"`
+	Status    IntakeStatus `gorm:"type:text;default:'PENDING';not null;index" json:"status"`
 	RetryCount int          `gorm:"default:0;not null" json:"retry_count"`
 	CreatedAt time.Time    `gorm:"default:now()" json:"created_at"`
 	UpdatedAt time.Time    `gorm:"default:now()" json:"updated_at"`
@@ -61,7 +61,7 @@ type Intake struct {
 
 type Brief struct {
 	ID                uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	IntakeID          uuid.UUID      `gorm:"type:uuid;uniqueIndex;not null" json:"intake_id"`
+	IntakeID          uuid.UUID      `gorm:"type:uuid;index:idx_brief_intake,unique;not null" json:"intake_id"`
 	Summary           string         `json:"summary"`
 	Goals             datatypes.JSON `gorm:"type:jsonb;default:'[]';not null;index:,type:gin" json:"goals"`
 	SuccessCriteria   datatypes.JSON `gorm:"type:jsonb;default:'[]';not null" json:"success_criteria"`
@@ -71,7 +71,7 @@ type Brief struct {
 	CotLog            string         `json:"cot_log"`
 	ConfidenceScore   float32        `json:"confidence_score"`
 	ToneProfile       string         `json:"tone_profile"`
-	ShareToken        string         `gorm:"uniqueIndex;not null" json:"share_token"`
+	ShareToken        string         `gorm:"index:idx_brief_share,unique;not null" json:"share_token"`
 	IsConfirmed       bool           `gorm:"default:false;not null" json:"is_confirmed"`
 	ConfirmedAt       *time.Time     `json:"confirmed_at"`
 	ClientName        string         `json:"client_name"`

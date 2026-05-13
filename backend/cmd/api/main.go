@@ -13,30 +13,22 @@ import (
 	"github.com/softworks/briefly-backend/internal/db"
 	"github.com/softworks/briefly-backend/internal/handlers"
 	"github.com/softworks/briefly-backend/internal/models"
+	"gorm.io/gorm"
 )
 
 func main() {
 	// Initialize database and Redis
 	db.Init()
 
-	// Auto-migrate models individually (CRDB best practice)
-	migrateModels := []interface{}{
+	// Use a local session for migration to avoid tainting global state
+	err := db.DB.Session(&gorm.Session{}).AutoMigrate(
 		&models.User{},
 		&models.Intake{},
 		&models.Brief{},
 		&models.Feedback{},
-	}
-
-	for _, model := range migrateModels {
-		// Retry a few times if CRDB is still waking up
-		for i := 0; i < 3; i++ {
-			err := db.DB.AutoMigrate(model)
-			if err == nil {
-				break
-			}
-			log.Printf("Migration warning for %T (retry %d): %v", model, i+1, err)
-			time.Sleep(2 * time.Second)
-		}
+	)
+	if err != nil {
+		log.Printf("Migration warning: %v. Continuing initialization...", err)
 	}
 
 	// Create default user for demo
