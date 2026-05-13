@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Briefly Pentagram: Teammate Onboarding Script
 # Usage: ./scripts/join_cluster.sh <PRIMARY_NODE_IP>
