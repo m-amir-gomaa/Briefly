@@ -24,13 +24,23 @@ BRIEFLY_DEMO_GEMINI_API_KEY=$BRIEFLY_DEMO_GEMINI_API_KEY
 GOOGLE_API_KEY=$GOOGLE_API_KEY
 EOF
 
-# 2. Check Tailscale connectivity
-echo "Checking connectivity to Primary Node..."
-if ping -c 1 "$PRIMARY_IP" &> /dev/null; then
-    echo "✅ Primary node is reachable."
+# 2. Check connectivity to Primary Node (Database Port 26257)
+echo "Checking connectivity to Primary Node (100.124.255.38:26257)..."
+if command -v nc &> /dev/null; then
+    if nc -z -w 5 "$PRIMARY_IP" 26257; then
+        echo "✅ Primary node is reachable."
+    else
+        echo "❌ Primary node NOT reachable on port 26257. Ensure Docker is running on Alpha."
+        exit 1
+    fi
 else
-    echo "❌ Primary node NOT reachable. Ensure you are on the same Tailscale network."
-    exit 1
+    # Fallback to ping if nc is missing
+    if ping -c 1 -W 2 "$PRIMARY_IP" &> /dev/null; then
+        echo "✅ Primary node is reachable (via ping)."
+    else
+        echo "❌ Primary node NOT reachable. Ensure you are on the same Tailscale network."
+        exit 1
+    fi
 fi
 
 # 3. Start Secondary Node Services
