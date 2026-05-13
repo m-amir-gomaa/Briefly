@@ -43,9 +43,10 @@ else
     fi
 fi
 
-# 3. Start Secondary Node Services
-echo "Starting api-beta and worker-beta..."
-docker compose -f docker-compose.distributed.yml up -d --build api-beta worker-beta
+# 3. Force clean old ghosts and Start Secondary Node Services
+echo "Cleaning old containers and starting node services..."
+docker rm -f api-beta worker-beta api-node worker-node &> /dev/null || true
+docker compose -f docker-compose.node.yml up -d --build
 
 echo "--- Setup Complete! ---"
 echo "Your node (Beta) is now processing requests and contributing to the mesh."
