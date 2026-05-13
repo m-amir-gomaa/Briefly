@@ -74,12 +74,13 @@ func SubmitIntake(c *gin.Context) {
 
 	// 3. Enqueue job to Redis
 	jobPayload, _ := json.Marshal(map[string]interface{}{
-		"intake_id":   intake.ID,
-		"type":        intake.Type,
-		"audio_url":   intake.AudioURL,
-		"image_url":   intake.ImageURL,
-		"raw_text":    intake.RawText,
-		"enqueued_at": time.Now().Format(time.RFC3339),
+		"intake_id":      intake.ID,
+		"type":           intake.Type,
+		"audio_url":      intake.AudioURL,
+		"image_url":      intake.ImageURL,
+		"raw_text":       intake.RawText,
+		"gemini_api_key": user.GeminiAPIKey,
+		"enqueued_at":    time.Now().Format(time.RFC3339),
 	})
 	
 	db.Redis.LPush(db.Ctx, "intake:queue", jobPayload)

@@ -38,6 +38,7 @@ type User struct {
 	Email        string    `gorm:"uniqueIndex;not null" json:"email"`
 	AgencyName   string    `json:"agency_name"`
 	PasswordHash string    `json:"-"`
+	GeminiAPIKey string    `json:"-"` // Hidden from JSON
 	CreatedAt    time.Time `gorm:"default:now()" json:"created_at"`
 	UpdatedAt    time.Time `gorm:"default:now()" json:"updated_at"`
 }

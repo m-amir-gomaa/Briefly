@@ -15,14 +15,16 @@ from langchain_core.output_parsers import JsonOutputParser
 from langgraph.graph import StateGraph, END
 
 # --- AI Configuration ---
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-genai.configure(api_key=GOOGLE_API_KEY)
+# Global defaults (can be overridden per-request)
+DEFAULT_GOOGLE_API_KEY = os.getenv("DEMO_GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
-    temperature=0.1,
-    google_api_key=GOOGLE_API_KEY
-)
+def get_llm(api_key: str = None):
+    key = api_key or DEFAULT_GOOGLE_API_KEY
+    return ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        temperature=0.1,
+        google_api_key=key
+    )
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 API_URL = os.getenv("API_URL", "http://localhost:8080")
@@ -71,6 +73,7 @@ class IntakeState(TypedDict):
     confidence_score: float
     tone_profile: str
     retry_count: int
+    gemini_api_key: Optional[str]
 
 # --- Node Functions ---
 
@@ -78,8 +81,10 @@ async def node_ingest(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Ingest - Starting pipeline")
     return state
 
-async def process_media_with_gemini(file_path: str, mime_type: str, prompt: str) -> str:
+async def process_media_with_gemini(file_path: str, mime_type: str, prompt: str, api_key: str = None) -> str:
     """Helper to upload to Gemini and get result."""
+    key = api_key or DEFAULT_GOOGLE_API_KEY
+    genai.configure(api_key=key)
     try:
         # Upload to Gemini Files API
         file_handle = genai.upload_file(path=file_path, mime_type=mime_type)
@@ -125,7 +130,7 @@ async def node_transcribe(state: IntakeState) -> IntakeState:
             elif key.endswith(".mp4"): mime_type = "video/mp4"
 
             prompt = "Please provide a verbatim transcription of this audio. If it is a video, transcribe the spoken parts."
-            state["transcription"] = await process_media_with_gemini(tmp.name, mime_type, prompt)
+            state["transcription"] = await process_media_with_gemini(tmp.name, mime_type, prompt, state.get("gemini_api_key"))
             os.unlink(tmp.name)
     except Exception as e:
         print(f"[{state['intake_id']}] Transcription Error: {e}")
@@ -149,7 +154,7 @@ async def node_vision(state: IntakeState) -> IntakeState:
             if key.endswith(".png"): mime_type = "image/png"
 
             prompt = "Describe everything in this image in detail, extracting any text you see."
-            state["ocr_text"] = await process_media_with_gemini(tmp.name, mime_type, prompt)
+            state["ocr_text"] = await process_media_with_gemini(tmp.name, mime_type, prompt, state.get("gemini_api_key"))
             os.unlink(tmp.name)
     except Exception as e:
         print(f"[{state['intake_id']}] Vision Error: {e}")
@@ -190,6 +195,7 @@ async def node_analyze(state: IntakeState) -> IntakeState:
     - success_criteria: list of 3 specific KPIs.
     - constraints: list of 3 budget/time/technical constraints.
     """)
+    llm = get_llm(state.get("gemini_api_key"))
     chain = prompt | llm | JsonOutputParser()
     try:
         res = await chain.ainvoke({"context": state["unified_context"]})
@@ -213,6 +219,7 @@ async def node_ambiguity(state: IntakeState) -> IntakeState:
     - ambiguities: list of objects with 'field_missing', 'reason', 'suggested_question'.
     - followup_questions: list of 3 strings for the user.
     """)
+    llm = get_llm(state.get("gemini_api_key"))
     chain = prompt | llm | JsonOutputParser()
     try:
         res = await chain.ainvoke({
@@ -322,5 +329,6 @@ async def run_pipeline(payload: dict):
         confidence_score=0.0,
         tone_profile="",
         retry_count=0,
+        gemini_api_key=payload.get("gemini_api_key"),
     )
     await app_graph.ainvoke(state)

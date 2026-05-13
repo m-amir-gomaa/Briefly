@@ -43,12 +43,18 @@ func main() {
 	var user models.User
 	if err := db.DB.Where("email = ?", "demo@softworks.ai").First(&user).Error; err != nil {
 		user = models.User{
-			Email:       "demo@softworks.ai",
-			AgencyName:  "Softworks Studio",
+			Email:        "demo@softworks.ai",
+			AgencyName:   "Softworks Studio",
 			PasswordHash: "hashed_password", // Placeholder
+			GeminiAPIKey: os.Getenv("BRIEFLY_DEMO_GEMINI_API_KEY"),
 		}
 		db.DB.Create(&user)
-		log.Printf("Created default demo user: %s", user.ID)
+		log.Printf("Created default demo user: %s with custom API key", user.ID)
+	} else {
+		// Update existing demo user key if env var is set
+		if key := os.Getenv("BRIEFLY_DEMO_GEMINI_API_KEY"); key != "" {
+			db.DB.Model(&user).Update("gemini_api_key", key)
+		}
 	}
 
 	port := os.Getenv("PORT")
