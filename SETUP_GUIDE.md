@@ -62,3 +62,4 @@ Follow these steps on each teammate's laptop:
 - **Firewall**: If nodes cannot connect, ensure port `26257` (DB) and `6379` (Redis) are open on the seed node.
 - **Nix Drift**: If a node behaves differently, run `nix flake update` and redeploy.
 
+
