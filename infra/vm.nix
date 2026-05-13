@@ -69,13 +69,11 @@
   virtualisation.memorySize = 4096;
   virtualisation.diskSize = 40960;
 
-  # CPU: 2 cores
-  virtualisation.cores = 2;
-  
-  # Allow the VM script to automatically choose between KVM and TCG (software emulation)
-  # This makes the project portable across physical hardware and cloud VMs.
+  # CPU: 2 cores via QEMU SMP
   virtualisation.qemu.options = [
-    "-display none"
+    "-cpu host"
+    "-enable-kvm"
+    "-smp 2"
   ];
 
   # Port forwards — NixOS wires these through the default user-mode NIC safely.
