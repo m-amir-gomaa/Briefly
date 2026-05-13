@@ -3,7 +3,6 @@ import { CreditCard, Globe, KeyRound, LockKeyhole, Mail, Shield, User, Wand2 } f
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import Input from '../components/ui/Input'
-import LanguageToggle from '../components/shared/LanguageToggle'
 import { useAuthStore } from '../store/useAuthStore'
 
 type Tab = 'profile' | 'security' | 'preferences' | 'billing'
@@ -173,11 +172,7 @@ export default function AccountView() {
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
-                  <p className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">Default language</p>
-                  <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">Controls the brief output language.</p>
-                  <LanguageToggle />
-                </div>
+
                 <label className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800">
                   <span className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">Tone profile</span>
                   <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">Set the voice for generated briefs.</p>

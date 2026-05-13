@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, Sparkles, ClipboardList, Link2, Mic, Image, Moon, Sun, LayoutDashboard, Settings, LogOut, User } from 'lucide-react'
 import { useAuthStore } from '../../store/useAuthStore'
 
+
 interface HomeHeaderProps {
   onNavigate: (path: string) => void
 }
@@ -162,16 +163,19 @@ export default function HomeHeader({ onNavigate }: HomeHeaderProps) {
             </div>
           </nav>
 
-          {/* Dark mode toggle */}
-          <button
-            type="button"
-            onClick={() => setDarkMode((prev) => !prev)}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-sm transition-all duration-200 ease-in-out hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
-            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={darkMode ? 'Light mode' : 'Dark mode'}
-          >
-            {darkMode ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-          </button>
+          {/* Language and Dark mode toggles */}
+          <div className="flex items-center gap-2">
+
+            <button
+              type="button"
+              onClick={() => setDarkMode((prev) => !prev)}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-sm transition-all duration-200 ease-in-out hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
+              aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={darkMode ? 'Light mode' : 'Dark mode'}
+            >
+              {darkMode ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+            </button>
+          </div>
 
           {isAuthenticated ? (
             /* Account circle + dropdown */

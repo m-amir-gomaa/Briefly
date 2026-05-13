@@ -70,11 +70,11 @@ export default function FeatureShowcase() {
   return (
     <section className="mt-16 sm:mt-20">
       {/* Section heading */}
-      <div className="mb-10 text-center sm:mb-12">
-        <h2 className="text-2xl font-semibold tracking-normal text-zinc-950 sm:text-3xl md:text-4xl">
-          <span className="italic font-light text-zinc-500 dark:text-zinc-400">What Does </span>
-          <span className="font-bold text-zinc-950 dark:text-zinc-50">Briefly</span>
-          <span className="italic font-light text-zinc-500 dark:text-zinc-400"> Really do?</span>
+      <div className="mb-10 mt-12 flex justify-center text-center sm:mb-12">
+        <h2 className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-2 text-2xl font-semibold tracking-normal text-zinc-950 sm:text-3xl md:text-4xl">
+          <span className="italic text-zinc-500 dark:text-zinc-400">What Does</span>
+          <img src="/title-black.png" alt="Briefly" className="h-8 object-contain sm:h-10 dark:invert" />
+          <span className="italic text-zinc-500 dark:text-zinc-400">Really do?</span>
         </h2>
       </div>
 
@@ -141,8 +141,8 @@ export default function FeatureShowcase() {
         </div>
 
         {/* Right — Media placeholder */}
-        <div className="flex items-center justify-center">
-          <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg shadow-zinc-200/50 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-black/30">
+        <div className="flex items-center justify-center w-full">
+          <div className="aspect-video w-full overflow-hidden rounded-2xl border border-zinc-200/50 bg-white/50 backdrop-blur-sm shadow-lg shadow-zinc-200/50 dark:border-zinc-700/50 dark:bg-zinc-900/50 dark:shadow-black/30">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeIndex}

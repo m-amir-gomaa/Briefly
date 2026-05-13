@@ -47,8 +47,9 @@ export interface IntakeRecord {
 
 interface SubmitIntakeInput {
   rawText: string
-  audioBlob: Blob | null
-  imageFile: File | null
+  audioBlobs: Blob[]
+  audioFiles: File[]
+  imageFiles: File[]
 }
 
 interface SubmitIntakeResponse {
@@ -142,20 +143,38 @@ export function normalizeIntake(raw: unknown): IntakeRecord {
 
 export async function submitIntake({
   rawText,
-  audioBlob,
-  imageFile,
+  audioBlobs,
+  audioFiles,
+  imageFiles,
 }: SubmitIntakeInput): Promise<SubmitIntakeResponse> {
   const formData = new FormData()
   formData.append('raw_text', rawText)
 
-  if (audioBlob) {
-    formData.append('has_audio', 'true')
-    formData.append('audio_file', audioBlob, 'briefly-recording.webm')
+  let hasAudio = false;
+
+  if (audioBlobs && audioBlobs.length > 0) {
+    hasAudio = true;
+    audioBlobs.forEach((blob, idx) => {
+      formData.append('audio_file', blob, `briefly-recording-${idx}.webm`)
+    })
   }
 
-  if (imageFile) {
+  if (audioFiles && audioFiles.length > 0) {
+    hasAudio = true;
+    audioFiles.forEach(file => {
+      formData.append('audio_file', file)
+    })
+  }
+
+  if (hasAudio) {
+    formData.append('has_audio', 'true')
+  }
+
+  if (imageFiles && imageFiles.length > 0) {
     formData.append('has_image', 'true')
-    formData.append('image_file', imageFile)
+    imageFiles.forEach(file => {
+      formData.append('image_file', file)
+    })
   }
 
   return apiRequest<SubmitIntakeResponse>('/api/v1/intake', {

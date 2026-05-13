@@ -13,6 +13,11 @@ import AboutView from './views/About'
 import ContactView from './views/Contact'
 import PrivacyView from './views/Privacy'
 import TermsView from './views/Terms'
+import CalendarView from './views/Calendar'
+import ProjectsView from './views/Projects'
+import BriefsView from './views/Briefs'
+import ClientsView from './views/Clients'
+import TeamView from './views/Team'
 import { useAuthStore } from './store/useAuthStore'
 
 function publicTokenFromPath(path: string) {
@@ -88,6 +93,16 @@ function App() {
         return <IntakeView onNavigate={navigate} />
       case '/account':
         return <AccountView />
+      case '/calendar':
+        return <CalendarView />
+      case '/projects':
+        return <ProjectsView onNavigate={navigate} />
+      case '/briefs':
+        return <BriefsView onNavigate={navigate} />
+      case '/clients':
+        return <ClientsView />
+      case '/team':
+        return <TeamView />
       default:
         return <DashboardView onNavigate={navigate} />
     }

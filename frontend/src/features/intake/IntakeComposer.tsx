@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
-import { ArrowRight, FileText, Image, Mic, Sparkles } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowRight, FileText, Image, Mic, Sparkles, Paperclip, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import ProcessingChecklist from '../../components/shared/ProcessingChecklist'
@@ -12,10 +12,24 @@ interface IntakeComposerProps {
   onNavigate: (path: string) => void
 }
 
+function ImageThumbnail({ file }: { file: File }) {
+  const [url, setUrl] = useState('')
+  
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file)
+    setUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [file])
+  
+  if (!url) return <Image className="h-4 w-4 text-zinc-500" />
+  return <img src={url} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-zinc-200 dark:ring-zinc-700" />
+}
+
 export default function IntakeComposer({ onNavigate }: IntakeComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
-  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [audioBlobs, setAudioBlobs] = useState<Blob[]>([])
+  const [audioFiles, setAudioFiles] = useState<File[]>([])
+  const [imageFiles, setImageFiles] = useState<File[]>([])
   const {
     rawText,
     status,
@@ -34,24 +48,47 @@ export default function IntakeComposer({ onNavigate }: IntakeComposerProps) {
 
   const isBusy = status === 'UPLOADING' || status === 'PROCESSING'
   const canSubmit = useMemo(
-    () => Boolean((rawText.trim() || audioBlob || imageFile) && status === 'IDLE'),
-    [audioBlob, imageFile, rawText, status],
+    () => Boolean((rawText.trim() || audioBlobs.length > 0 || audioFiles.length > 0 || imageFiles.length > 0) && status === 'IDLE'),
+    [audioBlobs.length, audioFiles.length, imageFiles.length, rawText, status],
   )
 
-  const handleAudioChange = (blob: Blob | null) => {
-    setAudioBlob(blob)
-    setHasAudio(Boolean(blob))
+  const handleRecordComplete = (blob: Blob) => {
+    setAudioBlobs(prev => [...prev, blob])
+    setHasAudio(true)
   }
 
-  const handleImageChange = (file: File | null) => {
-    setImageFile(file)
-    setHasImage(Boolean(file))
+  const handleRemoveAudio = (index: number) => {
+    setAudioBlobs(prev => {
+      const next = [...prev]
+      next.splice(index, 1)
+      if (next.length === 0 && audioFiles.length === 0) setHasAudio(false)
+      return next
+    })
+  }
+
+  const handleRemoveAudioFile = (index: number) => {
+    setAudioFiles(prev => {
+      const next = [...prev]
+      next.splice(index, 1)
+      if (next.length === 0 && audioBlobs.length === 0) setHasAudio(false)
+      return next
+    })
+  }
+
+  const handleRemoveImage = (index: number) => {
+    setImageFiles(prev => {
+      const next = [...prev]
+      next.splice(index, 1)
+      if (next.length === 0) setHasImage(false)
+      return next
+    })
   }
 
   const handleNewDraft = () => {
     reset()
-    setAudioBlob(null)
-    setImageFile(null)
+    setAudioBlobs([])
+    setAudioFiles([])
+    setImageFiles([])
   }
 
   return (
@@ -85,35 +122,89 @@ export default function IntakeComposer({ onNavigate }: IntakeComposerProps) {
             />
           </div>
 
-          <div className="sticky bottom-0 border-t border-zinc-200 bg-white/90 px-4 py-4 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/90">
-            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
-              <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800">
-                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
-                  <Mic className="h-3.5 w-3.5" />
-                  Audio
-                </div>
-                <AudioRecorder audioBlob={audioBlob} disabled={status !== 'IDLE'} onChange={handleAudioChange} />
+          <div className="sticky bottom-0 border-t border-zinc-200 bg-white/90 px-4 py-3 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/90">
+            {/* Previews Area */}
+            {(imageFiles.length > 0 || audioFiles.length > 0 || audioBlobs.length > 0) && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-zinc-100 pb-3 dark:border-zinc-800">
+                {imageFiles.map((file, idx) => (
+                  <div key={`img-${idx}`} className="flex items-center gap-2 rounded-full border border-zinc-200 bg-zinc-50 pl-1.5 pr-3 py-1.5 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-800">
+                    <ImageThumbnail file={file} />
+                    <span className="max-w-[120px] truncate text-zinc-700 dark:text-zinc-300">{file.name}</span>
+                    <button type="button" onClick={() => handleRemoveImage(idx)} className="ml-1 text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100 transition-colors">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {audioFiles.map((file, idx) => (
+                  <div key={`af-${idx}`} className="flex items-center gap-2 rounded-full border border-zinc-200 bg-zinc-50 pl-2.5 pr-3 py-1.5 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-800">
+                    <Paperclip className="h-4 w-4 shrink-0 text-zinc-500" />
+                    <span className="max-w-[120px] truncate text-zinc-700 dark:text-zinc-300">{file.name}</span>
+                    <button type="button" onClick={() => handleRemoveAudioFile(idx)} className="ml-1 text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100 transition-colors">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {audioBlobs.map((blob, idx) => (
+                  <div key={`ab-${idx}`} className="flex items-center gap-2 rounded-full border border-zinc-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 dark:border-red-900/30 dark:bg-red-950/30 dark:text-red-400">
+                    <Mic className="h-3.5 w-3.5" />
+                    <span>Voice memo {idx + 1}</span>
+                    <button type="button" onClick={() => handleRemoveAudio(idx)} className="ml-1 text-red-400 hover:text-red-900 dark:hover:text-red-200">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="secondary"
+                  className="rounded-full !px-4"
+                  onClick={() => document.getElementById('unified-file-input')?.click()}
+                  disabled={status !== 'IDLE'}
+                  icon={<Paperclip className="h-4 w-4" />}
+                >
+                  Attach media
+                </Button>
+                <input
+                  type="file"
+                  id="unified-file-input"
+                  className="hidden"
+                  accept="image/*,audio/*"
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length > 0) {
+                      const newImages = files.filter(f => f.type.startsWith('image/'));
+                      const newAudio = files.filter(f => f.type.startsWith('audio/'));
+                      
+                      if (newImages.length > 0) {
+                        setImageFiles(prev => [...prev, ...newImages]);
+                        setHasImage(true);
+                      }
+                      if (newAudio.length > 0) {
+                        setAudioFiles(prev => [...prev, ...newAudio]);
+                        setHasAudio(true);
+                      }
+                    }
+                    e.target.value = '';
+                  }}
+                />
+                <AudioRecorder disabled={status !== 'IDLE'} onRecordComplete={handleRecordComplete} />
               </div>
 
-              <div className="rounded-xl bg-zinc-50 p-3 dark:bg-zinc-800">
-                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
-                  <Image className="h-3.5 w-3.5" />
-                  Image
-                </div>
-                <ImageDropzone imageFile={imageFile} disabled={status !== 'IDLE'} onChange={handleImageChange} />
-              </div>
-
-              <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <p className="hidden text-xs text-zinc-500 sm:block">{rawText.length} chars</p>
                 <Button
                   size="lg"
                   disabled={!canSubmit}
-                  onClick={() => void submitIntake(audioBlob, imageFile)}
+                  onClick={() => void submitIntake(audioBlobs, audioFiles, imageFiles)}
                   icon={<Sparkles className="h-4 w-4" />}
-                  className="w-full lg:w-44"
+                  className="w-full rounded-full sm:w-44"
                 >
                   Generate
                 </Button>
-                <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">{rawText.length} chars</p>
               </div>
             </div>
           </div>
@@ -124,8 +215,8 @@ export default function IntakeComposer({ onNavigate }: IntakeComposerProps) {
         {(status !== 'IDLE' || currentIntakeId) && (
           <ProcessingChecklist
             status={status}
-            hasAudio={Boolean(audioBlob)}
-            hasImage={Boolean(imageFile)}
+            hasAudio={audioBlobs.length > 0 || audioFiles.length > 0}
+            hasImage={imageFiles.length > 0}
           />
         )}
 

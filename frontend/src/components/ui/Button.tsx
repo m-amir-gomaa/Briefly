@@ -35,7 +35,7 @@ export default function Button({
     <button
       type={type}
       className={[
-        'inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-200 ease-in-out focus:outline-none focus:ring-4 focus:ring-zinc-200 disabled:pointer-events-none disabled:opacity-50 dark:focus:ring-zinc-700',
+        'inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-200 ease-in-out focus:outline-none focus:ring-4 focus:ring-zinc-200 disabled:pointer-events-none disabled:opacity-50 dark:focus:ring-zinc-700 active:scale-95 hover:shadow-md',
         variantClass[variant],
         sizeClass[size],
         className,

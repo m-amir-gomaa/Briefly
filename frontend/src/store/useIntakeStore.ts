@@ -26,7 +26,7 @@ interface IntakeState {
   
   refreshTrackedIntakes: () => Promise<void>;
   fetchIntake: (id: string) => Promise<IntakeRecord | null>;
-  submitIntake: (audioBlob: Blob | null, imageFile: File | null) => Promise<void>;
+  submitIntake: (audioBlobs: Blob[], audioFiles: File[], imageFiles: File[]) => Promise<void>;
   subscribeToEvents: (id: string) => void;
   reset: () => void;
 }
@@ -89,15 +89,16 @@ export const useIntakeStore = create<IntakeState>((set, get) => ({
     }
   },
 
-  submitIntake: async (audioBlob, imageFile) => {
+  submitIntake: async (audioBlobs, audioFiles, imageFiles) => {
     const { rawText } = get();
     set({ status: 'UPLOADING', errorMessage: null, eventMessage: null });
 
     try {
       const data = await apiSubmitIntake({
         rawText,
-        audioBlob,
-        imageFile,
+        audioBlobs,
+        audioFiles,
+        imageFiles,
       });
 
       set({ currentIntakeId: data.intake_id, status: 'PROCESSING' });

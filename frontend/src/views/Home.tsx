@@ -17,11 +17,7 @@ interface HomeViewProps {
   onNavigate: (path: string) => void
 }
 
-const proofPoints = [
-  { label: 'Inputs', value: 'Text, voice, image' },
-  { label: 'Output', value: 'Structured brief' },
-  { label: 'Review', value: 'Client-ready link' },
-]
+
 
 const workflowItems = [
   {
@@ -49,7 +45,7 @@ export default function HomeView({ onNavigate }: HomeViewProps) {
     <div className="home-gradient-bg flex min-h-screen flex-col text-zinc-950 transition-colors duration-300 dark:text-zinc-100">
       <HomeHeader onNavigate={onNavigate} />
 
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-16">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-10 pt-20 sm:px-6 sm:pb-14 sm:pt-28 lg:px-8 lg:pb-16 lg:pt-36">
         <section className="grid items-center gap-8 pb-16 sm:pb-20 lg:grid-cols-[minmax(0,0.9fr)_minmax(520px,1.1fr)]">
           <motion.div
             initial={{ opacity: 0, y: 14 }}
@@ -84,24 +80,16 @@ export default function HomeView({ onNavigate }: HomeViewProps) {
               </Button>
             </div>
 
-            <div className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-3">
-              {proofPoints.map((item) => (
-                <Card key={item.label} className="p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">{item.label}</p>
-                  <p className="mt-2 text-sm font-semibold leading-5 text-zinc-950 dark:text-zinc-100">{item.value}</p>
-                </Card>
-              ))}
-            </div>
-          </motion.div>
+            </motion.div>
 
           <motion.div
             id="preview"
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: 'easeOut', delay: 0.08 }}
-            className="flex items-center justify-center"
+            className="flex items-center justify-center w-full"
           >
-            <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-lg shadow-zinc-200/50 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-black/30">
+            <div className="aspect-video w-full overflow-hidden rounded-2xl border border-zinc-200/50 bg-white/50 backdrop-blur-sm shadow-lg shadow-zinc-200/50 dark:border-zinc-700/50 dark:bg-zinc-900/50 dark:shadow-black/30">
               <div className="flex h-full w-full flex-col items-center justify-center p-8">
                 {/* Decorative skeleton content — matching FeatureShowcase placeholder */}
                 <div className="w-full max-w-xs space-y-4">

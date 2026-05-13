@@ -86,23 +86,23 @@ export default function DashboardView({ onNavigate }: DashboardProps) {
         </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="grid gap-5 md:grid-cols-3">
         {[
-          { label: 'Completed briefs', value: stats.completed, icon: CheckCircle2 },
-          { label: 'Processing now', value: stats.processing, icon: Loader2 },
-          { label: 'Client approvals', value: stats.approved, icon: ClipboardList },
+          { label: 'Completed briefs', value: stats.completed, icon: CheckCircle2, colorClass: 'text-emerald-600 dark:text-emerald-400', bgClass: 'bg-emerald-100 dark:bg-emerald-500/20' },
+          { label: 'Processing now', value: stats.processing, icon: Loader2, colorClass: 'text-blue-600 dark:text-blue-400', bgClass: 'bg-blue-100 dark:bg-blue-500/20' },
+          { label: 'Client approvals', value: stats.approved, icon: ClipboardList, colorClass: 'text-purple-600 dark:text-purple-400', bgClass: 'bg-purple-100 dark:bg-purple-500/20' },
         ].map((stat) => {
           const Icon = stat.icon
 
           return (
-            <Card key={stat.label}>
+            <Card key={stat.label} className="relative overflow-hidden group border-zinc-200/60 dark:border-zinc-800/60 transition-shadow hover:shadow-md dark:hover:shadow-black/40">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{stat.label}</p>
-                  <p className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950 dark:text-zinc-100">{stat.value}</p>
+                  <p className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{stat.label}</p>
+                  <p className="mt-3 text-4xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50">{stat.value}</p>
                 </div>
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                  <Icon className="h-5 w-5" />
+                <span className={`flex h-14 w-14 items-center justify-center rounded-2xl ${stat.bgClass} ${stat.colorClass} transition-transform group-hover:scale-110`}>
+                  <Icon className="h-6 w-6" />
                 </span>
               </div>
             </Card>

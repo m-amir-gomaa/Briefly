@@ -8,10 +8,14 @@ import {
   Settings,
   Sun,
   Zap,
+  Calendar,
+  FolderKanban,
+  Files,
+  Users,
+  UsersRound,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
-import LanguageToggle from '../shared/LanguageToggle'
 import { useAuthStore } from '../../store/useAuthStore'
 
 interface AppLayoutProps {
@@ -29,6 +33,11 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/intake/new', label: 'New Intake', icon: FilePlus2 },
+  { path: '/projects', label: 'Projects', icon: FolderKanban },
+  { path: '/briefs', label: 'Briefs', icon: Files },
+  { path: '/calendar', label: 'Calendar', icon: Calendar },
+  { path: '/clients', label: 'Clients', icon: Users },
+  { path: '/team', label: 'Team', icon: UsersRound },
   { path: '/account', label: 'Account', icon: Settings },
 ]
 
@@ -36,6 +45,11 @@ function getBreadcrumb(path: string) {
   if (path.startsWith('/intake/new')) return ['Briefly', 'New Intake']
   if (path.startsWith('/intake/')) return ['Briefly', 'Brief Review']
   if (path.startsWith('/account')) return ['Briefly', 'Account']
+  if (path.startsWith('/calendar')) return ['Briefly', 'Calendar']
+  if (path.startsWith('/projects')) return ['Briefly', 'Projects']
+  if (path.startsWith('/briefs')) return ['Briefly', 'Briefs']
+  if (path.startsWith('/clients')) return ['Briefly', 'Clients']
+  if (path.startsWith('/team')) return ['Briefly', 'Team']
   return ['Briefly', 'Dashboard']
 }
 
@@ -57,6 +71,16 @@ export default function AppLayout({ children, currentPath, onNavigate }: AppLayo
   const logout = useAuthStore((state) => state.logout)
   const breadcrumb = getBreadcrumb(currentPath)
   const [darkMode, setDarkMode] = useState(getInitialDarkMode)
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  // Handle scroll for transparent header
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   // Sync dark mode class
   useEffect(() => {
@@ -65,18 +89,25 @@ export default function AppLayout({ children, currentPath, onNavigate }: AppLayo
   }, [darkMode])
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950 transition-colors duration-300 dark:bg-zinc-950 dark:text-zinc-100 lg:grid lg:grid-cols-[76px_minmax(0,1fr)]">
-      <aside className="hidden border-r border-zinc-200 bg-white lg:flex lg:min-h-screen lg:flex-col lg:items-center lg:py-4 dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="flex min-h-screen bg-zinc-50 text-zinc-950 transition-colors duration-300 dark:bg-zinc-950 dark:text-zinc-100">
+      {/* Sidebar spacer to prevent content push */}
+      <div className="hidden lg:block w-[76px] shrink-0"></div>
+      
+      {/* Actual Sidebar */}
+      <aside className="group fixed top-0 left-0 hidden h-screen w-[76px] border-r border-zinc-200/50 bg-white/20 backdrop-blur-xl transition-[width] duration-300 ease-in-out hover:w-64 delay-0 hover:delay-500 overflow-hidden z-40 lg:flex lg:flex-col lg:items-start lg:py-4 lg:px-3 dark:border-zinc-800/50 dark:bg-zinc-950/20">
         <button
           type="button"
-          onClick={() => onNavigate('/dashboard')}
-          className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-950 text-white shadow-sm transition-all duration-200 ease-in-out hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
-          aria-label="Go to dashboard"
+          onClick={() => onNavigate('/')}
+          className="mb-6 flex h-11 w-full items-center justify-start rounded-xl px-2.5 transition-all duration-200 ease-in-out hover:opacity-80"
+          aria-label="Go to home"
         >
-          <Zap className="h-5 w-5" />
+          <div className="relative flex h-6 w-full shrink-0 items-center justify-start">
+            <img src="/logo-black.png" alt="Briefly" className="absolute left-[3px] top-0 h-6 object-contain dark:invert transition-opacity duration-300 group-hover:opacity-0" />
+            <img src="/logo-title-black.png" alt="Briefly" className="absolute left-[3px] top-0 h-6 w-auto max-w-none object-contain object-left dark:invert opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          </div>
         </button>
 
-        <nav className="flex flex-1 flex-col gap-2" aria-label="Primary navigation">
+        <nav className="flex w-full flex-1 flex-col gap-2" aria-label="Primary navigation">
           {navItems.map((item) => {
             const active = isActive(currentPath, item.path)
             const Icon = item.icon
@@ -88,14 +119,19 @@ export default function AppLayout({ children, currentPath, onNavigate }: AppLayo
                 onClick={() => onNavigate(item.path)}
                 title={item.label}
                 className={[
-                  'flex h-11 w-11 items-center justify-center rounded-md transition-all duration-200 ease-in-out',
+                  'flex h-11 w-full items-center justify-start rounded-md px-2.5 transition-all duration-200 ease-in-out',
                   active
                     ? 'bg-zinc-950 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-950'
                     : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100',
                 ].join(' ')}
                 aria-label={item.label}
               >
-                <Icon className="h-5 w-5" />
+                <div className="flex w-6 shrink-0 justify-center">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="ml-3 truncate whitespace-nowrap opacity-0 transition-opacity duration-300 group-hover:opacity-100 font-medium">
+                  {item.label}
+                </span>
               </button>
             )
           })}
@@ -108,16 +144,25 @@ export default function AppLayout({ children, currentPath, onNavigate }: AppLayo
             onNavigate('/login')
           }}
           title="Sign out"
-          className="flex h-11 w-11 items-center justify-center rounded-md text-zinc-500 transition-all duration-200 ease-in-out hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          className="flex h-11 w-full items-center justify-start rounded-md px-2.5 text-zinc-500 transition-all duration-200 ease-in-out hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
           aria-label="Sign out"
         >
-          <LogOut className="h-5 w-5" />
+          <div className="flex w-6 shrink-0 justify-center">
+            <LogOut className="h-5 w-5" />
+          </div>
+          <span className="ml-3 truncate whitespace-nowrap opacity-0 transition-opacity duration-300 group-hover:opacity-100 font-medium">
+            Sign out
+          </span>
         </button>
       </aside>
 
-      <main className="min-w-0">
-        <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/85 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/85">
-          <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+      <main className="min-w-0 flex-1">
+        <header className={`sticky top-0 z-30 transition-all duration-300 ${
+          isScrolled 
+            ? 'border-b border-zinc-200/50 bg-white/20 backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-950/20' 
+            : 'border-b border-transparent bg-transparent dark:border-transparent dark:bg-transparent'
+        }`}>
+          <div className="flex h-20 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
@@ -138,7 +183,7 @@ export default function AppLayout({ children, currentPath, onNavigate }: AppLayo
             </div>
 
             <div className="flex items-center gap-2">
-              <LanguageToggle />
+
               {/* Dark mode toggle */}
               <button
                 type="button"
