@@ -155,6 +155,7 @@ func UpdateIntakeResults(c *gin.Context) {
 		FollowupQuestions: questionsJSON,
 		ToneProfile:       req.ToneProfile,
 		ConfidenceScore:   req.ConfidenceScore,
+		ShareToken:        uuid.New().String(),
 	}
 
 	if err := db.DB.Create(&brief).Error; err != nil {
