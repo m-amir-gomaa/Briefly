@@ -6,55 +6,46 @@ This diagram details the comprehensive architecture powering the Briefly platfor
 
 ```mermaid
 flowchart TB
-    %% --- Client Layer ---
-    subgraph Client_Layer [Client & Edge Tier]
-        Browser[("🌐 Web Browser\n(React + Vite + Zustand)")]
-        CF_WAF["🛡️ Cloudflare WAF\n(DDoS & Rate Limiting)"]
+    subgraph Client_Layer [Client and Edge Tier]
+        Browser[("🌐 Web Browser<br>(React + Vite + Zustand)")]
+        CF_WAF["🛡️ Cloudflare WAF<br>(DDoS & Rate Limiting)"]
     end
 
-    %% --- Ingress Layer (Briefly-VM) ---
-    subgraph Ingress_Layer [Ingress & Proxy Layer]
-        Caddy["🕸️ Caddy Reverse Proxy\n(TLS Termination & Routing)"]
-        Tailscale["🦎 Tailscale Mesh\n(Secure Internal Networking)"]
+    subgraph Ingress_Layer [Ingress and Proxy Layer]
+        Caddy["🕸️ Caddy Reverse Proxy<br>(TLS Termination & Routing)"]
+        Tailscale["🦎 Tailscale Mesh<br>(Secure Internal Networking)"]
     end
 
-    %% --- Application Layer ---
-    subgraph Application_Layer [Application Tier (Go + Python)]
-        Go_API_Alpha["🚀 Go API (Alpha)\n(Gin, GORM, SSE)"]
-        Go_API_Beta["🚀 Go API (Beta)\n(Gin, GORM, SSE)"]
+    subgraph Application_Layer [Application Tier Go and Python]
+        Go_API_Alpha["🚀 Go API Alpha<br>(Gin, GORM, SSE)"]
+        Go_API_Beta["🚀 Go API Beta<br>(Gin, GORM, SSE)"]
         
-        Py_Worker_Alpha["🧠 AI Worker (Alpha)\n(Python, LangGraph, FastAPI)"]
-        Py_Worker_Beta["🧠 AI Worker (Beta)\n(Python, LangGraph, FastAPI)"]
+        Py_Worker_Alpha["🧠 AI Worker Alpha<br>(Python, LangGraph, FastAPI)"]
+        Py_Worker_Beta["🧠 AI Worker Beta<br>(Python, LangGraph, FastAPI)"]
     end
 
-    %% --- Persistence & Caching Layer ---
-    subgraph Data_Layer [Data & Persistence Tier]
-        CRDB[("🦖 CockroachDB\n(Distributed SQL)") ]
-        Redis[("⚡ Redis\n(KV Cache & Message Queue)")]
-        MinIO[("📦 MinIO / R2\n(S3-Compatible Object Storage)")]
+    subgraph Data_Layer [Data and Persistence Tier]
+        CRDB[("🦖 CockroachDB<br>(Distributed SQL)")]
+        Redis[("⚡ Redis<br>(KV Cache & Message Queue)")]
+        MinIO[("📦 MinIO / R2<br>(S3-Compatible Object Storage)")]
     end
 
-    %% --- External AI Layer ---
     subgraph External_AI [External Intelligence]
-        Gemini["✨ Google Gemini 1.5 Flash\n(Multimodal Inference)"]
+        Gemini["✨ Google Gemini 1.5 Flash<br>(Multimodal Inference)"]
     end
 
-    %% --- Network Flow ---
     Browser -- "1. Upload Assets / Request Web UI" --> CF_WAF
     CF_WAF -- "2. Proxy Traffic" --> Tailscale
     Tailscale -- "3. Forward to VM" --> Caddy
 
-    %% --- Caddy Routing ---
     Caddy -- "4a. Static Assets (/*)" --> Browser
     Caddy -- "4b. API Requests (/api/*)" --> Go_API_Alpha
     Caddy -. "4c. Real-Time Status Stream (SSE)" .-> Go_API_Beta
 
-    %% --- Backend Operations ---
     Go_API_Alpha -- "5. Store Metadata" --> CRDB
     Go_API_Alpha -- "6. Upload Media Files" --> MinIO
     Go_API_Alpha -- "7. Publish Intake Job (LPUSH)" --> Redis
     
-    %% --- Worker Operations ---
     Redis -- "8. Consume Job (BRPOP)" --> Py_Worker_Alpha
     Redis -- "8. Consume Job (BRPOP)" --> Py_Worker_Beta
     
@@ -63,7 +54,6 @@ flowchart TB
     Py_Worker_Alpha -- "11. Save Results" --> CRDB
     Py_Worker_Alpha -- "12. Publish Event Update" --> Redis
 
-    %% --- SSE Delivery ---
     Redis -- "13. Listen for Updates" --> Go_API_Alpha
     Go_API_Alpha -. "14. Push Event Datagram" .-> Browser
 ```
