@@ -14,20 +14,20 @@ const productLinks = [
 const resourceLinks = [
   { label: 'Workflow', href: '#workflow' },
   { label: 'Product Preview', href: '#preview' },
-  { label: 'API Documentation', href: '#' },
+  { label: 'API Documentation', path: '/contact' },
 ]
 
 const companyLinks: { label: string; href?: string; path?: string }[] = [
   { label: 'About', path: '/about' },
-  { label: 'Blog', href: '#' },
-  { label: 'Careers', href: '#' },
+  { label: 'Blog', path: '/about' },
+  { label: 'Careers', path: '/contact' },
   { label: 'Contact', path: '/contact' },
 ]
 
 const socialLinks = [
-  { icon: Github, href: '#', label: 'GitHub' },
-  { icon: Twitter, href: '#', label: 'Twitter' },
-  { icon: Linkedin, href: '#', label: 'LinkedIn' },
+  { icon: Github, href: 'https://github.com', label: 'GitHub' },
+  { icon: Twitter, href: 'https://twitter.com', label: 'Twitter' },
+  { icon: Linkedin, href: 'https://linkedin.com', label: 'LinkedIn' },
   { icon: Mail, href: 'mailto:hello@briefly.ai', label: 'Email' },
 ]
 
@@ -103,12 +103,22 @@ export default function HomeFooter({ onNavigate }: HomeFooterProps) {
             <ul className="mt-4 space-y-3">
               {resourceLinks.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-zinc-500 transition-colors duration-200 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100"
-                  >
-                    {link.label}
-                  </a>
+                  {link.path ? (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate(link.path!)}
+                      className="text-sm text-zinc-500 transition-colors duration-200 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100"
+                    >
+                      {link.label}
+                    </button>
+                  ) : (
+                    <a
+                      href={link.href}
+                      className="text-sm text-zinc-500 transition-colors duration-200 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100"
+                    >
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
@@ -150,13 +160,28 @@ export default function HomeFooter({ onNavigate }: HomeFooterProps) {
             &copy; {currentYear} Briefly. All rights reserved.
           </p>
           <div className="flex items-center gap-5">
-            <button type="button" onClick={() => onNavigate('/privacy')} className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600">
+            <button 
+              type="button" 
+              id="footer-privacy-link"
+              onClick={() => onNavigate('/privacy')} 
+              className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600 dark:hover:text-zinc-300"
+            >
               Privacy Policy
             </button>
-            <button type="button" onClick={() => onNavigate('/terms')} className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600">
+            <button 
+              type="button" 
+              id="footer-terms-link"
+              onClick={() => onNavigate('/terms')} 
+              className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600 dark:hover:text-zinc-300"
+            >
               Terms of Service
             </button>
-            <button type="button" onClick={() => onNavigate('/privacy')} className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600">
+            <button 
+              type="button" 
+              id="footer-cookies-link"
+              onClick={() => onNavigate('/privacy')} 
+              className="text-xs text-zinc-400 transition-colors duration-200 hover:text-zinc-600 dark:hover:text-zinc-300"
+            >
               Cookies
             </button>
           </div>

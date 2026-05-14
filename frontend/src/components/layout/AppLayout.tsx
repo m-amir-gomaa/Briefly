@@ -196,10 +196,14 @@ export default function AppLayout({ children, currentPath, onNavigate }: AppLayo
               <button
                 type="button"
                 onClick={() => onNavigate('/account')}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-sm font-semibold text-zinc-700 shadow-sm transition-all duration-200 ease-in-out hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600"
+                className="flex h-10 w-10 overflow-hidden items-center justify-center rounded-full border border-zinc-200 bg-white text-sm font-semibold text-zinc-700 shadow-sm transition-all duration-200 ease-in-out hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600"
                 aria-label="Open account"
               >
-                {(user?.agencyName || 'D').slice(0, 1).toUpperCase()}
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                ) : (
+                  (user?.agency_name || user?.email || 'D').slice(0, 1).toUpperCase()
+                )}
               </button>
             </div>
           </div>

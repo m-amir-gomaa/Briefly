@@ -65,9 +65,33 @@ func main() {
 	// API v1 group
 	v1 := r.Group("/api/v1")
 	{
-		// Intake routes
-		v1.POST("/intake", handlers.SubmitIntake)
-		v1.GET("/intake/:id", handlers.GetIntakeStatus)
+		// Auth routes
+		auth := v1.Group("/auth")
+		{
+			auth.POST("/register", handlers.Register)
+			auth.POST("/login", handlers.Login)
+			auth.POST("/logout", handlers.Logout)
+			auth.GET("/google", handlers.GoogleLogin)
+			auth.GET("/google/callback", handlers.GoogleCallback)
+
+			// Protected auth routes
+			authProtected := auth.Group("")
+			authProtected.Use(handlers.AuthMiddleware())
+			{
+				authProtected.GET("/me", handlers.GetMe)
+				authProtected.PATCH("/me", handlers.UpdateProfile)
+				authProtected.GET("/intakes", handlers.ListIntakes)
+				authProtected.GET("/briefs", handlers.ListBriefs)
+				authProtected.POST("/intake", handlers.SubmitIntake)
+				authProtected.GET("/intake/:id", handlers.GetIntakeStatus)
+
+				// Billing routes
+				authProtected.POST("/billing/create-checkout", handlers.CreateCheckoutSession)
+			}
+		}
+
+		// Webhooks (unprotected)
+		v1.POST("/billing/webhook", handlers.StripeWebhook)
 		v1.PATCH("/intake/:id/confirm", handlers.UpdateIntakeResults)
 
 		// Public Brief routes

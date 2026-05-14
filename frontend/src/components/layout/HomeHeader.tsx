@@ -64,7 +64,7 @@ export default function HomeHeader({ onNavigate }: HomeHeaderProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const userInitial = (user?.agencyName || user?.email || 'U').slice(0, 1).toUpperCase()
+  const userInitial = (user?.agency_name || user?.email || 'U').slice(0, 1).toUpperCase()
 
   return (
     <header 
@@ -198,7 +198,7 @@ export default function HomeHeader({ onNavigate }: HomeHeaderProps) {
                 <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1.5 shadow-xl shadow-zinc-200/60 animate-in fade-in slide-in-from-top-1 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-black/40">
                   {/* User info */}
                   <div className="border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
-                    <p className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">{user?.agencyName || 'User'}</p>
+                    <p className="text-sm font-semibold text-zinc-950 dark:text-zinc-100">{user?.agency_name || 'User'}</p>
                     <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">{user?.email || ''}</p>
                   </div>
 

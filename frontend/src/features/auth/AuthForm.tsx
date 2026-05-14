@@ -19,13 +19,26 @@ const fadeUp = {
 
 export default function AuthForm({ mode, onNavigate }: AuthFormProps) {
   const login = useAuthStore((state) => state.login)
+  const register = useAuthStore((state) => state.register)
   const isRegister = mode === 'register'
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
-    await login(String(formData.get('email') || ''), String(formData.get('password') || ''))
-    onNavigate('/dashboard')
+    const email = String(formData.get('email') || '')
+    const password = String(formData.get('password') || '')
+    
+    try {
+      if (isRegister) {
+        const agencyName = String(formData.get('agencyName') || '')
+        await register(email, password, agencyName)
+      } else {
+        await login(email, password)
+      }
+      onNavigate('/dashboard')
+    } catch (error: any) {
+      alert(error.message || 'Authentication failed')
+    }
   }
 
   const inputClass =
@@ -40,16 +53,10 @@ export default function AuthForm({ mode, onNavigate }: AuthFormProps) {
       className="space-y-4"
     >
       {isRegister && (
-        <motion.div variants={fadeUp} className="grid grid-cols-2 gap-3">
+        <motion.div variants={fadeUp}>
           <input
-            name="firstName"
-            placeholder="First Name"
-            className={inputClass}
-            required
-          />
-          <input
-            name="lastName"
-            placeholder="Last Name"
+            name="agencyName"
+            placeholder="Agency or Company Name"
             className={inputClass}
             required
           />
@@ -142,8 +149,7 @@ export default function AuthForm({ mode, onNavigate }: AuthFormProps) {
         <button
           type="button"
           onClick={() => {
-            login('google@briefly.ai', 'demo')
-            onNavigate('/dashboard')
+            window.location.href = '/api/v1/auth/google'
           }}
           className="flex w-full items-center justify-center gap-3 rounded-full border border-zinc-300 bg-white py-3.5 text-sm font-semibold text-zinc-700 shadow-sm transition-all duration-200 hover:bg-zinc-50 hover:text-zinc-950 active:scale-95 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
         >

@@ -23,9 +23,17 @@ func SubmitIntake(c *gin.Context) {
 
 	rawText := c.PostForm("raw_text")
 	
-	// Fetch demo user for hackathon
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+		return
+	}
+
 	var user models.User
-	db.DB.First(&user) // Get first user (the one we created on startup)
+	if err := db.DB.First(&user, "id = ?", userID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find user"})
+		return
+	}
 	
 	intakeType := models.IntakeTypeText
 	if c.PostForm("has_audio") == "true" {
@@ -164,4 +172,21 @@ func UpdateIntakeResults(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Intake processed and brief created", "brief_id": brief.ID})
+}
+
+// ListIntakes handles GET /api/v1/intakes
+func ListIntakes(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+		return
+	}
+
+	var intakes []models.Intake
+	if err := db.DB.Preload("Brief").Where("user_id = ?", userID).Order("created_at desc").Find(&intakes).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch intakes"})
+		return
+	}
+
+	c.JSON(http.StatusOK, intakes)
 }

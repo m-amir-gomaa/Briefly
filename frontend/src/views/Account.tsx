@@ -63,25 +63,29 @@ export default function AccountView() {
             <>
               <Card>
                 <div className="mb-6 flex items-center gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 text-2xl font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                    {(user?.agencyName || 'D').slice(0, 1).toUpperCase()}
+                  <div className="flex h-16 w-16 overflow-hidden items-center justify-center rounded-full bg-zinc-100 text-2xl font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                    {user?.avatar_url ? (
+                      <img src={user.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                    ) : (
+                      (user?.agency_name || user?.email || 'D').slice(0, 1).toUpperCase()
+                    )}
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-100">{user?.agencyName || 'Demo Agency'}</h2>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">{user?.email || 'demo@briefly.ai'}</p>
+                    <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-100">{user?.agency_name || 'Demo Agency'}</h2>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">{user?.email}</p>
                   </div>
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-2">
                   <label>
                     <span className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Agency name</span>
-                    <Input defaultValue={user?.agencyName || 'Demo Agency'} />
+                    <Input defaultValue={user?.agency_name || ''} />
                   </label>
                   <label>
                     <span className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Email address</span>
                     <div className="relative">
                       <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                      <Input defaultValue={user?.email || 'demo@briefly.ai'} className="pl-9" />
+                      <Input disabled defaultValue={user?.email || ''} className="pl-9" />
                     </div>
                   </label>
                 </div>
@@ -207,10 +211,25 @@ export default function AccountView() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">Current plan</p>
-                    <p className="mt-1 text-2xl font-semibold tracking-normal text-zinc-950 dark:text-zinc-100">Hackathon Demo</p>
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Free tier — unlimited during hackathon.</p>
+                    <p className="mt-1 text-2xl font-semibold tracking-normal capitalize text-zinc-950 dark:text-zinc-100">{user?.plan_tier || 'Free'}</p>
+                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                      {user?.plan_tier === 'pro' ? 'Unlimited briefs.' : 'Free tier — 3 briefs per month.'}
+                    </p>
                   </div>
-                  <Button disabled className="shrink-0">Upgrade to Pro</Button>
+                  <Button 
+                    disabled={user?.plan_tier === 'pro'} 
+                    className="shrink-0"
+                    onClick={async () => {
+                      try {
+                        const { url } = await import('../services/api').then(m => m.createCheckoutSession())
+                        window.location.href = url
+                      } catch (e) {
+                        alert('Failed to start checkout session')
+                      }
+                    }}
+                  >
+                    {user?.plan_tier === 'pro' ? 'Current Plan' : 'Upgrade to Pro'}
+                  </Button>
                 </div>
               </div>
 
@@ -229,7 +248,7 @@ export default function AccountView() {
 
               <div className="mt-6 border-t border-zinc-200 pt-5 dark:border-zinc-800">
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  Upgrade wiring will be available when Stripe keys and backend billing endpoints are ready.
+                  Payments are processed securely via Stripe.
                 </p>
               </div>
             </Card>

@@ -39,6 +39,10 @@ type User struct {
 	AgencyName   string    `json:"agency_name"`
 	PasswordHash string    `json:"-"`
 	GeminiAPIKey string    `json:"-"` // Hidden from JSON
+	GoogleID     string    `gorm:"uniqueIndex" json:"-"`
+	AvatarURL    string    `json:"avatar_url"`
+	PlanTier     string    `gorm:"default:'free'" json:"plan_tier"`
+	StripeCustomerID string `json:"-"`
 	CreatedAt    time.Time `gorm:"default:now()" json:"created_at"`
 	UpdatedAt    time.Time `gorm:"default:now()" json:"updated_at"`
 }

@@ -188,6 +188,16 @@ export async function getIntake(id: string): Promise<IntakeRecord> {
   return normalizeIntake(raw)
 }
 
+export async function listIntakes(): Promise<IntakeRecord[]> {
+  const raw = await apiRequest<unknown[]>('/api/v1/intakes')
+  return (raw || []).map(normalizeIntake)
+}
+
+export async function listBriefs(): Promise<BriefRecord[]> {
+  const raw = await apiRequest<unknown[]>('/api/v1/briefs')
+  return (raw || []).map((b) => normalizeBrief(b) as BriefRecord).filter(Boolean)
+}
+
 export async function getPublicBrief(token: string): Promise<BriefRecord> {
   const raw = await apiRequest<unknown>(`/api/v1/public/brief/${token}`)
   const brief = normalizeBrief(raw)
@@ -207,5 +217,47 @@ export async function confirmPublicBrief(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ client_name: clientName }),
+  })
+}
+
+// --- Auth Endpoints ---
+export interface UserProfile {
+  id: string
+  email: string
+  agency_name: string
+  avatar_url: string
+  plan_tier: string
+}
+
+export async function loginWithEmail(email: string, password: string): Promise<UserProfile> {
+  const resp = await apiRequest<{ message: string; user: UserProfile }>('/api/v1/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  return resp.user
+}
+
+export async function registerWithEmail(email: string, password: string, agency_name: string): Promise<UserProfile> {
+  const resp = await apiRequest<{ message: string; user: UserProfile }>('/api/v1/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, agency_name }),
+  })
+  return resp.user
+}
+
+export async function fetchMe(): Promise<UserProfile> {
+  return apiRequest<UserProfile>('/api/v1/auth/me')
+}
+
+export async function logoutUser(): Promise<void> {
+  await apiRequest('/api/v1/auth/logout', { method: 'POST' })
+}
+
+// --- Billing Endpoints ---
+export async function createCheckoutSession(): Promise<{ url: string }> {
+  return apiRequest<{ url: string }>('/api/v1/billing/create-checkout', {
+    method: 'POST',
   })
 }

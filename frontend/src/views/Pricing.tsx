@@ -4,6 +4,8 @@ import HomeFooter from '../components/layout/HomeFooter'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { Check } from 'lucide-react'
+import { useAuthStore } from '../store/useAuthStore'
+import { createCheckoutSession } from '../services/api'
 
 interface PricingViewProps {
   onNavigate: (path: string) => void
@@ -38,6 +40,35 @@ const plans = [
 ]
 
 export default function PricingView({ onNavigate }: PricingViewProps) {
+  const user = useAuthStore((state) => state.user)
+
+  const handleAction = async (planName: string) => {
+    if (planName === 'Enterprise') {
+      onNavigate('/contact')
+      return
+    }
+
+    if (planName === 'Pro' && user) {
+      if (user.plan_tier === 'pro') {
+        alert('You are already on the Pro plan!')
+        return
+      }
+      try {
+        const { url } = await createCheckoutSession()
+        window.location.href = url
+      } catch (error) {
+        alert('Failed to start checkout session. Please try again later.')
+      }
+      return
+    }
+
+    if (user) {
+      onNavigate('/dashboard')
+    } else {
+      onNavigate('/register')
+    }
+  }
+
   return (
     <div className="home-gradient-bg flex min-h-screen flex-col text-zinc-950 transition-colors duration-300 dark:text-zinc-100">
       <HomeHeader onNavigate={onNavigate} />
@@ -91,7 +122,7 @@ export default function PricingView({ onNavigate }: PricingViewProps) {
                 <Button
                   variant={plan.popular ? 'primary' : 'secondary'}
                   className="w-full"
-                  onClick={() => onNavigate(plan.name === 'Enterprise' ? '/contact' : '/register')}
+                  onClick={() => handleAction(plan.name)}
                 >
                   {plan.buttonText}
                 </Button>

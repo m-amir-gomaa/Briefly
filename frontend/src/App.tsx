@@ -29,6 +29,12 @@ function publicTokenFromPath(path: string) {
 function App() {
   const [path, setPath] = useState(window.location.pathname)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const isInitializing = useAuthStore((state) => state.isInitializing)
+  const checkAuth = useAuthStore((state) => state.checkAuth)
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
 
   useEffect(() => {
     const handlePopState = () => setPath(window.location.pathname)
@@ -39,6 +45,17 @@ function App() {
   const navigate = (to: string) => {
     window.history.pushState({}, '', to)
     setPath(to)
+  }
+
+  if (isInitializing) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+          <p className="text-gray-500 dark:text-gray-400">Loading Briefly...</p>
+        </div>
+      </div>
+    )
   }
 
   if (path.startsWith('/public/')) {

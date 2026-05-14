@@ -55,3 +55,24 @@ func ConfirmBrief(c *gin.Context) {
 		"confirmed_at": now,
 	})
 }
+
+// ListBriefs handles GET /api/v1/briefs
+func ListBriefs(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+		return
+	}
+
+	var briefs []models.Brief
+	// Join with Intakes to filter by UserID
+	if err := db.DB.Joins("JOIN intakes ON intakes.id = briefs.intake_id").
+		Where("intakes.user_id = ?", userID).
+		Order("briefs.created_at desc").
+		Find(&briefs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch briefs"})
+		return
+	}
+
+	c.JSON(http.StatusOK, briefs)
+}
