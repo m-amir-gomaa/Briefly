@@ -23,8 +23,7 @@ def get_llm(api_key: str = None):
     return ChatGoogleGenerativeAI(
         model="gemini-1.5-flash",
         temperature=0.1,
-        google_api_key=key,
-        model_kwargs={"response_mime_type": "application/json"}
+        google_api_key=key
     )
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
