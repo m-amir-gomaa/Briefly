@@ -1,0 +1,16 @@
+Hey team,
+
+I'm attaching a quick sketch I did on the whiteboard for the new fitness app we discussed. 
+Basically, we need a mobile app that lets users log their workouts. 
+The main things are:
+- A login screen (needs to support Apple and Google login).
+- A dashboard that shows their weekly progress in a bar chart.
+- A way to add a new workout (just simple stuff like pushups, running, etc).
+
+I'm not sure if we need a social feed yet, maybe we can add that in phase 2? Or if it's easy, let's just do it now. 
+Also, can the app be dark mode by default? My eyes hurt when apps are too bright.
+
+Let me know how much this will cost and when we can start.
+
+Thanks,
+John
