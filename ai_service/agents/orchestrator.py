@@ -21,7 +21,7 @@ DEFAULT_GOOGLE_API_KEY = os.getenv("DEMO_GOOGLE_API_KEY") or os.getenv("GOOGLE_A
 def get_llm(api_key: str = None):
     key = api_key or DEFAULT_GOOGLE_API_KEY
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash",
         temperature=0.1,
         google_api_key=key
     )
@@ -100,7 +100,7 @@ async def process_media_with_gemini(file_path: str, mime_type: str, prompt: str,
             raise ValueError(f"Gemini file processing failed: {file_handle.name}")
 
         # Generate content
-        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+        model = genai.GenerativeModel(model_name="gemini-2.0-flash")
         response = model.generate_content([file_handle, prompt])
         
         # Cleanup
