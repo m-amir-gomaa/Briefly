@@ -1,10 +1,11 @@
 import os
 import json
+import asyncio
 import tempfile
 import time
 from typing import Optional, List, TypedDict
 
-import google.generativeai as genai
+import google.genai as genai
 import boto3
 import httpx
 import redis.asyncio as redis
@@ -15,16 +16,34 @@ from langchain_core.output_parsers import JsonOutputParser
 from langgraph.graph import StateGraph, END
 
 # --- AI Configuration ---
-# Global defaults (can be overridden per-request)
 DEFAULT_GOOGLE_API_KEY = os.getenv("DEMO_GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+MODEL_NAME = "gemini-2.0-flash"
 
 def get_llm(api_key: str = None):
     key = api_key or DEFAULT_GOOGLE_API_KEY
     return ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model=MODEL_NAME,
         temperature=0.1,
         google_api_key=key
     )
+
+async def invoke_with_backoff(chain, inputs: dict, max_retries: int = 5) -> dict:
+    """Invoke a LangChain chain with exponential backoff for rate limit errors."""
+    delay = 30
+    for attempt in range(max_retries):
+        try:
+            return await chain.ainvoke(inputs)
+        except Exception as e:
+            err_str = str(e)
+            # Retry on rate limit (429) or server errors (5xx)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "500" in err_str or "503" in err_str:
+                if attempt < max_retries - 1:
+                    print(f"  [Rate limit/server error] Retrying in {delay}s (attempt {attempt + 1}/{max_retries})...")
+                    await asyncio.sleep(delay)
+                    delay = min(delay * 2, 300)  # cap at 5 minutes
+                    continue
+            raise  # re-raise non-retryable errors
+    raise RuntimeError(f"Failed after {max_retries} attempts.")
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 API_URL = os.getenv("API_URL", "http://localhost:8080")
@@ -82,49 +101,55 @@ async def node_ingest(state: IntakeState) -> IntakeState:
     return state
 
 async def process_media_with_gemini(file_path: str, mime_type: str, prompt: str, api_key: str = None) -> str:
-    """Helper to upload to Gemini and get result."""
+    """Helper to upload a file to Gemini Files API and generate a response. Uses google.genai SDK."""
     key = api_key or DEFAULT_GOOGLE_API_KEY
-    genai.configure(api_key=key)
+    client = genai.Client(api_key=key)
     try:
-        # Upload to Gemini Files API
-        file_handle = genai.upload_file(path=file_path, mime_type=mime_type)
-        print(f"Uploaded file to Gemini: {file_handle.name}")
+        print(f"  Uploading media file to Gemini Files API...")
+        with open(file_path, "rb") as f:
+            upload_response = client.files.upload(
+                file=f,
+                config={"mime_type": mime_type}
+            )
+        file_handle = upload_response
+        print(f"  Uploaded: {file_handle.name}")
 
         # Wait for processing
         while file_handle.state.name == "PROCESSING":
             print(".", end="", flush=True)
             time.sleep(2)
-            file_handle = genai.get_file(file_handle.name)
+            file_handle = client.files.get(name=file_handle.name)
+        print()
 
         if file_handle.state.name == "FAILED":
             raise ValueError(f"Gemini file processing failed: {file_handle.name}")
 
         # Generate content
-        model = genai.GenerativeModel(model_name="gemini-2.0-flash")
-        response = model.generate_content([file_handle, prompt])
-        
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=[file_handle, prompt]
+        )
+
         # Cleanup
-        genai.delete_file(file_handle.name)
-        
+        client.files.delete(name=file_handle.name)
+
         return response.text
     except Exception as e:
         print(f"Gemini Media Error: {e}")
         return f"[Media Processing Error: {str(e)}]"
 
 async def node_transcribe(state: IntakeState) -> IntakeState:
-    print(f"[{state['intake_id']}] Node Transcribe (Gemini 1.5 Flash)")
+    print(f"[{state['intake_id']}] Node Transcribe (Gemini Files API)")
     if not state.get("audio_url"):
         state["transcription"] = ""
         return state
 
     try:
-        # Download from S3 (MinIO)
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
             bucket = "briefly-intake"
             key = state["audio_url"].split("/")[-1]
             s3_client.download_file(bucket, key, tmp.name)
-            
-            # Determine mime type
+
             mime_type = "audio/mpeg"
             if key.endswith(".wav"): mime_type = "audio/wav"
             elif key.endswith(".mp4"): mime_type = "video/mp4"
@@ -135,11 +160,11 @@ async def node_transcribe(state: IntakeState) -> IntakeState:
     except Exception as e:
         print(f"[{state['intake_id']}] Transcription Error: {e}")
         state["transcription"] = f"[Error: {str(e)}]"
-    
+
     return state
 
 async def node_vision(state: IntakeState) -> IntakeState:
-    print(f"[{state['intake_id']}] Node Vision (Gemini 1.5 Flash)")
+    print(f"[{state['intake_id']}] Node Vision (Gemini Files API)")
     if not state.get("image_url"):
         state["ocr_text"] = ""
         return state
@@ -149,7 +174,7 @@ async def node_vision(state: IntakeState) -> IntakeState:
             bucket = "briefly-intake"
             key = state["image_url"].split("/")[-1]
             s3_client.download_file(bucket, key, tmp.name)
-            
+
             mime_type = "image/jpeg"
             if key.endswith(".png"): mime_type = "image/png"
 
@@ -159,12 +184,11 @@ async def node_vision(state: IntakeState) -> IntakeState:
     except Exception as e:
         print(f"[{state['intake_id']}] Vision Error: {e}")
         state["ocr_text"] = f"[Error: {str(e)}]"
-    
+
     return state
 
 async def node_transcribe_and_vision(state: IntakeState) -> IntakeState:
-    print(f"[{state['intake_id']}] Node Transcribe+Vision (parallel)")
-    # We run them sequentially for simplicity in the hackathon to avoid rate limits
+    print(f"[{state['intake_id']}] Node Transcribe+Vision (sequential)")
     state = await node_transcribe(state)
     state = await node_vision(state)
     return state
@@ -185,13 +209,13 @@ async def node_analyze(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Analyze")
     parser = JsonOutputParser()
     prompt = ChatPromptTemplate.from_template("""
-    You are Briefly AI, a professional project consultant. 
+    You are Briefly AI, a professional project consultant.
     Analyze the context provided and extract a structured project brief.
-    
+
     CONTEXT: {context}
 
     {format_instructions}
-    
+
     Ensure your output is ONLY valid JSON containing the following keys:
     - summary: 2-sentence executive summary.
     - goals: list of objects with 'title' (short) and 'detail' (1 sentence).
@@ -201,7 +225,7 @@ async def node_analyze(state: IntakeState) -> IntakeState:
     llm = get_llm(state.get("gemini_api_key"))
     chain = prompt | llm | parser
     try:
-        res = await chain.ainvoke({
+        res = await invoke_with_backoff(chain, {
             "context": state["unified_context"],
             "format_instructions": parser.get_format_instructions()
         })
@@ -223,7 +247,7 @@ async def node_ambiguity(state: IntakeState) -> IntakeState:
     GOALS: {goals}
 
     {format_instructions}
-    
+
     Ensure your output is ONLY valid JSON containing the following keys:
     - ambiguities: list of objects with 'field_missing', 'reason', 'suggested_question'.
     - followup_questions: list of 3 strings for the user.
@@ -231,7 +255,7 @@ async def node_ambiguity(state: IntakeState) -> IntakeState:
     llm = get_llm(state.get("gemini_api_key"))
     chain = prompt | llm | parser
     try:
-        res = await chain.ainvoke({
+        res = await invoke_with_backoff(chain, {
             "summary": state["summary"],
             "goals": json.dumps(state["goals"]),
             "format_instructions": parser.get_format_instructions()
@@ -276,7 +300,7 @@ async def node_finalize(state: IntakeState) -> IntakeState:
                 finally:
                     await redis_client.aclose()
             else:
-                print(f"[{state['intake_id']}] Failed to update Alpha Node: {resp.status_code}")
+                print(f"[{state['intake_id']}] Failed to update Alpha Node: {resp.status_code} - {resp.text}")
         except Exception as e:
             print(f"[{state['intake_id']}] Finalization Error: {e}")
 
