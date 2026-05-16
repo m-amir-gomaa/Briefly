@@ -18,10 +18,11 @@ _PROVIDER_MAP = {
     "ollama": OllamaProvider,
 }
 
-# Errors that indicate a bad/missing API key — we can fall back on these
+# Errors that indicate a bad/missing API key, or quota exhaustion — we can fall back on these
 _AUTH_ERROR_KEYWORDS = (
     "API_KEY_INVALID", "INVALID_ARGUMENT", "api key not valid",
     "401", "403", "UNAUTHENTICATED",
+    "429", "RESOURCE_EXHAUSTED", "Quota exceeded", "rate limit",
 )
 
 
