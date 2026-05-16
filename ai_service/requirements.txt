@@ -12,4 +12,5 @@ requests==2.31.0
 httpx
 boto3
 pytest
-pytest-asyncioprometheus_client
+pytest-asyncio
+prometheus_client
