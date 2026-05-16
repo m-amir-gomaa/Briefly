@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import asyncio
 import tempfile
@@ -11,10 +12,43 @@ import httpx
 import redis.asyncio as redis
 from botocore.client import Config
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langgraph.graph import StateGraph, END
 
 from providers import get_provider
+
+
+def extract_json_from_text(text: str) -> dict:
+    """Attempt to extract a JSON object from raw LLM output.
+    Works for models like tinyllama that may wrap JSON in prose."""
+    if isinstance(text, dict):
+        return text
+    raw = str(text).strip()
+
+    # 1. Try a direct JSON parse (best case — model output is clean)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    # 2. Try to find a JSON block between ```json ... ``` or ```...```
+    fence_match = re.search(r'```(?:json)?\s*({.*?})\s*```', raw, re.DOTALL)
+    if fence_match:
+        try:
+            return json.loads(fence_match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # 3. Find the first { ... } block spanning the whole depth
+    brace_match = re.search(r'(\{.*\})', raw, re.DOTALL)
+    if brace_match:
+        try:
+            return json.loads(brace_match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # 4. Nothing parseable — return empty dict so caller can use fallback
+    return {}
 
 # --- Configuration ---
 DEFAULT_GOOGLE_API_KEY = os.getenv("DEMO_GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
@@ -219,44 +253,46 @@ async def node_analyze(state: IntakeState) -> IntakeState:
         return state
 
     provider = get_provider(state.get("gemini_api_key"))
-    parser = JsonOutputParser()
+    # Use StrOutputParser for robustness — tinyllama may not output clean JSON
+    str_parser = StrOutputParser()
     prompt = ChatPromptTemplate.from_template("""
-You are Briefly AI, a professional project consultant.
-Analyze the context provided and extract a structured project brief.
+You are a project consultant. Extract a structured brief from the context.
+Respond with ONLY a valid JSON object — no explanation, no markdown, just JSON.
 
 CONTEXT: {context}
 
-{format_instructions}
-
-Ensure your output is ONLY valid JSON containing:
-- summary: A single string containing a 2-sentence executive summary.
-- goals: list of objects with 'title' (short) and 'detail' (1 sentence).
-- success_criteria: list of 3 specific, measurable KPIs.
-- constraints: list of 3 budget/time/technical constraints.
+JSON format (respond ONLY with this, filled in):
+{{"summary": "2-sentence executive summary here",
+  "goals": [{{"title": "Goal 1", "detail": "Detail here"}}, {{"title": "Goal 2", "detail": "Detail here"}}, {{"title": "Goal 3", "detail": "Detail here"}}],
+  "success_criteria": ["KPI 1", "KPI 2", "KPI 3"],
+  "constraints": ["Budget/time constraint", "Technical constraint", "Scope constraint"]}}
 """)
 
     async def _invoke(p):
         llm = p.get_llm()
-        chain = prompt | llm | parser
-        return await p.invoke_with_backoff(chain, {
-            "context": state["unified_context"],
-            "format_instructions": parser.get_format_instructions()
-        })
+        chain = prompt | llm | str_parser
+        raw = await p.invoke_with_backoff(chain, {"context": state["unified_context"]})
+        return extract_json_from_text(raw)
 
     try:
         res = await _invoke(provider)
-        # Update provider_name based on what actually ran
         active = getattr(provider, "active_name", type(provider).__name__.replace("Provider", ""))
         state["provider_name"] = active
-        state["summary"] = res.get("summary", "No summary generated.")
-        state["goals"] = res.get("goals", [])
-        state["success_criteria"] = res.get("success_criteria", [])
-        state["constraints"] = res.get("constraints", [])
+        if res.get("summary"):
+            state["summary"] = res.get("summary", "No summary generated.")
+            state["goals"] = res.get("goals", [])
+            state["success_criteria"] = res.get("success_criteria", [])
+            state["constraints"] = res.get("constraints", [])
+        else:
+            print(f"[{state['intake_id']}] JSON extraction yielded empty result — using fallback")
+            apply_fallback_analysis(state)
+            state["provider_name"] = f"{active}/partial"
     except Exception as e:
         print(f"[{state['intake_id']}] Extraction Error (all providers failed): {e}")
         apply_fallback_analysis(state)
         state["provider_name"] = "Fallback/Offline"
     return state
+
 
 async def node_ambiguity(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Ambiguity Review")
@@ -265,32 +301,32 @@ async def node_ambiguity(state: IntakeState) -> IntakeState:
         return state
 
     provider = get_provider(state.get("gemini_api_key"))
-    parser = JsonOutputParser()
+    str_parser = StrOutputParser()
     prompt = ChatPromptTemplate.from_template("""
-Review the project summary and goals. Identify missing information or potential risks.
+Review this project brief. Identify missing info and risks.
 SUMMARY: {summary}
 GOALS: {goals}
 
-{format_instructions}
-
-Ensure your output is ONLY valid JSON containing:
-- ambiguities: list of objects with 'field_missing', 'reason', 'suggested_question'.
-- followup_questions: list of 3 strings for the user.
+Respond with ONLY a valid JSON object:
+{{"ambiguities": [{{"field_missing": "Budget", "reason": "No budget specified", "suggested_question": "What is the budget?"}}],
+  "followup_questions": ["Question 1?", "Question 2?", "Question 3?"]}}
 """)
 
     async def _invoke(p):
         llm = p.get_llm()
-        chain = prompt | llm | parser
-        return await p.invoke_with_backoff(chain, {
+        chain = prompt | llm | str_parser
+        raw = await p.invoke_with_backoff(chain, {
             "summary": state["summary"],
             "goals": json.dumps(state["goals"]),
-            "format_instructions": parser.get_format_instructions()
         })
+        return extract_json_from_text(raw)
 
     try:
         res = await _invoke(provider)
         state["ambiguities"] = res.get("ambiguities", [])
         state["followup_questions"] = res.get("followup_questions", [])
+        if not state["ambiguities"]:
+            apply_fallback_ambiguity(state)
     except Exception as e:
         print(f"[{state['intake_id']}] Ambiguity Error (all providers failed): {e}")
         apply_fallback_ambiguity(state)
