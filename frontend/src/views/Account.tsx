@@ -17,6 +17,26 @@ const tabs: { id: Tab; label: string; icon: typeof User }[] = [
 export default function AccountView() {
   const user = useAuthStore((state) => state.user)
   const [activeTab, setActiveTab] = useState<Tab>('profile')
+  const [agencyName, setAgencyName] = useState(user?.agency_name || '')
+  const [geminiKey, setGeminiKey] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleUpdateProfile = async () => {
+    setLoading(true)
+    try {
+      const { updateProfile } = await import('../services/api').then(m => ({ updateProfile: m.updateProfile || m.updateProfile /* fallback if I rename */ }))
+      // Actually I named it UpdateProfile in the backend but I need to check the frontend service.
+      const api = await import('../services/api')
+      await api.updateProfile({ agency_name: agencyName, gemini_api_key: geminiKey })
+      alert('Profile updated successfully!')
+      // Refresh user data
+      await useAuthStore.getState().fetchMe()
+    } catch (e) {
+      alert('Failed to update profile')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -78,8 +98,20 @@ export default function AccountView() {
 
                 <div className="grid gap-5 sm:grid-cols-2">
                   <label>
-                    <span className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Agency name</span>
-                    <Input defaultValue={user?.agency_name || ''} />
+                    <Input value={agencyName} onChange={(e) => setAgencyName(e.target.value)} />
+                  </label>
+                  <label>
+                    <span className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Gemini API Key (Optional)</span>
+                    <div className="relative">
+                      <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                      <Input 
+                        type="password" 
+                        placeholder="Paste your key here" 
+                        className="pl-9" 
+                        value={geminiKey}
+                        onChange={(e) => setGeminiKey(e.target.value)}
+                      />
+                    </div>
                   </label>
                   <label>
                     <span className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Email address</span>
@@ -92,7 +124,7 @@ export default function AccountView() {
 
                 <div className="mt-6 flex items-center justify-between border-t border-zinc-200 pt-5 dark:border-zinc-800">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">Changes are applied workspace-wide.</p>
-                  <Button>Save changes</Button>
+                  <Button loading={loading} onClick={handleUpdateProfile}>Save changes</Button>
                 </div>
               </Card>
             </>

@@ -251,6 +251,14 @@ export async function fetchMe(): Promise<UserProfile> {
   return apiRequest<UserProfile>('/api/v1/auth/me')
 }
 
+export async function updateProfile(data: { agency_name?: string; gemini_api_key?: string }): Promise<void> {
+  await apiRequest('/api/v1/auth/me', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+}
+
 export async function logoutUser(): Promise<void> {
   await apiRequest('/api/v1/auth/logout', { method: 'POST' })
 }
