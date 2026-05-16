@@ -219,7 +219,6 @@ async def node_analyze(state: IntakeState) -> IntakeState:
         return state
 
     provider = get_provider(state.get("gemini_api_key"))
-    state["provider_name"] = f"{type(provider).__name__.replace('Provider', '')}"
     parser = JsonOutputParser()
     prompt = ChatPromptTemplate.from_template("""
 You are Briefly AI, a professional project consultant.
@@ -235,21 +234,28 @@ Ensure your output is ONLY valid JSON containing:
 - success_criteria: list of 3 specific, measurable KPIs.
 - constraints: list of 3 budget/time/technical constraints.
 """)
-    llm = provider.get_llm()
-    chain = prompt | llm | parser
-    try:
-        res = await provider.invoke_with_backoff(chain, {
+
+    async def _invoke(p):
+        llm = p.get_llm()
+        chain = prompt | llm | parser
+        return await p.invoke_with_backoff(chain, {
             "context": state["unified_context"],
             "format_instructions": parser.get_format_instructions()
         })
+
+    try:
+        res = await _invoke(provider)
+        # Update provider_name based on what actually ran
+        active = getattr(provider, "active_name", type(provider).__name__.replace("Provider", ""))
+        state["provider_name"] = active
         state["summary"] = res.get("summary", "No summary generated.")
         state["goals"] = res.get("goals", [])
         state["success_criteria"] = res.get("success_criteria", [])
         state["constraints"] = res.get("constraints", [])
     except Exception as e:
-        print(f"[{state['intake_id']}] Extraction Error: {e}")
-        # We no longer silently fallback. We re-raise to let the pipeline fail visibly.
-        raise e
+        print(f"[{state['intake_id']}] Extraction Error (all providers failed): {e}")
+        apply_fallback_analysis(state)
+        state["provider_name"] = "Fallback/Offline"
     return state
 
 async def node_ambiguity(state: IntakeState) -> IntakeState:
@@ -271,20 +277,23 @@ Ensure your output is ONLY valid JSON containing:
 - ambiguities: list of objects with 'field_missing', 'reason', 'suggested_question'.
 - followup_questions: list of 3 strings for the user.
 """)
-    llm = provider.get_llm()
-    chain = prompt | llm | parser
-    try:
-        res = await provider.invoke_with_backoff(chain, {
+
+    async def _invoke(p):
+        llm = p.get_llm()
+        chain = prompt | llm | parser
+        return await p.invoke_with_backoff(chain, {
             "summary": state["summary"],
             "goals": json.dumps(state["goals"]),
             "format_instructions": parser.get_format_instructions()
         })
+
+    try:
+        res = await _invoke(provider)
         state["ambiguities"] = res.get("ambiguities", [])
         state["followup_questions"] = res.get("followup_questions", [])
     except Exception as e:
-        print(f"[{state['intake_id']}] Ambiguity Error: {e}")
-        # Explicit error propagation
-        raise e
+        print(f"[{state['intake_id']}] Ambiguity Error (all providers failed): {e}")
+        apply_fallback_ambiguity(state)
     return state
 
 async def node_tone(state: IntakeState) -> IntakeState:
