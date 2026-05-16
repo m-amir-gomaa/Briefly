@@ -30,7 +30,7 @@ export default function AccountView() {
       await api.updateProfile({ agency_name: agencyName, gemini_api_key: geminiKey })
       alert('Profile updated successfully!')
       // Refresh user data
-      await useAuthStore.getState().fetchMe()
+      await useAuthStore.getState().checkAuth()
     } catch (e) {
       alert('Failed to update profile')
     } finally {
@@ -124,7 +124,7 @@ export default function AccountView() {
 
                 <div className="mt-6 flex items-center justify-between border-t border-zinc-200 pt-5 dark:border-zinc-800">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">Changes are applied workspace-wide.</p>
-                  <Button loading={loading} onClick={handleUpdateProfile}>Save changes</Button>
+                  <Button disabled={loading} onClick={handleUpdateProfile}>Save changes</Button>
                 </div>
               </Card>
             </>
