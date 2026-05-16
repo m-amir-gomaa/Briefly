@@ -54,7 +54,8 @@ func GoogleLogin(c *gin.Context) {
 	}
 
 	// Store state in a short-lived cookie for CSRF protection
-	c.SetCookie("oauth_state", state, 600, "/", "", false, true)
+	secure := os.Getenv("ENV") == "production" || os.Getenv("ENV") == "staging"
+	c.SetCookie("oauth_state", state, 600, "/", "", secure, true)
 
 	url := googleOAuthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	c.Redirect(http.StatusTemporaryRedirect, url)
@@ -128,13 +129,14 @@ func GoogleCallback(c *gin.Context) {
 	}
 
 	// Issue JWT
-	jwtToken, err := issueJWT(user)
+	tokenString, err := issueJWT(user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not issue token"})
 		return
 	}
 
-	c.SetCookie("auth_token", jwtToken, 86400*7, "/", "", false, true) // 7-day cookie
+	secure := os.Getenv("ENV") == "production" || os.Getenv("ENV") == "staging"
+	c.SetCookie("auth_token", tokenString, 86400*7, "/", "", secure, true)
 
 	// Redirect to the frontend dashboard
 	frontendURL := os.Getenv("FRONTEND_URL")
@@ -203,5 +205,5 @@ func issueJWT(user models.User) (string, error) {
 		"exp":     time.Now().Add(7 * 24 * time.Hour).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtKey)
+	return token.SignedString(getJWTKey())
 }
