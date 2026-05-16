@@ -4,7 +4,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/softworks/briefly-backend/internal/security"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type IntakeType string
@@ -46,6 +48,30 @@ type User struct {
 	CreatedAt    time.Time `gorm:"default:now()" json:"created_at"`
 	UpdatedAt    time.Time `gorm:"default:now()" json:"updated_at"`
 }
+
+func (u *User) BeforeSave(tx *gorm.DB) (err error) {
+	if u.GeminiAPIKey != "" {
+		// Only encrypt if it's not already encrypted (simple check)
+		if len(u.GeminiAPIKey) < 32 { // Encrypted strings are much longer
+			encrypted, err := security.Encrypt(u.GeminiAPIKey)
+			if err == nil {
+				u.GeminiAPIKey = encrypted
+			}
+		}
+	}
+	return nil
+}
+
+func (u *User) AfterFind(tx *gorm.DB) (err error) {
+	if u.GeminiAPIKey != "" {
+		decrypted, err := security.Decrypt(u.GeminiAPIKey)
+		if err == nil {
+			u.GeminiAPIKey = decrypted
+		}
+	}
+	return nil
+}
+
 
 type Intake struct {
 	ID        uuid.UUID    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`

@@ -1,0 +1,1 @@
+Project: Smart garden sensor. Goal: Monitor soil moisture and light levels. Target: Home gardeners.

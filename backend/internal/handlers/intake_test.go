@@ -14,8 +14,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/softworks/briefly-backend/internal/db"
 	"github.com/softworks/briefly-backend/internal/handlers"
+	"github.com/softworks/briefly-backend/internal/repository"
+	"github.com/softworks/briefly-backend/internal/service"
 	"github.com/stretchr/testify/assert"
 )
+
+func setupIntakeHandler(t *testing.T) *handlers.IntakeHandler {
+	intakeRepo := repository.NewIntakeRepository(db.DB)
+	intakeSvc := service.NewIntakeService(intakeRepo, db.Redis)
+	return handlers.NewIntakeHandler(intakeSvc, intakeRepo)
+}
 
 func TestSubmitIntake(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -29,15 +37,18 @@ func TestSubmitIntake(t *testing.T) {
 
 	db.SetupMockS3()
 
+	h := setupIntakeHandler(t)
 	r := gin.Default()
-	r.POST("/intake", handlers.SubmitIntake)
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uuid.New().String())
+		c.Next()
+	})
+	r.POST("/intake", h.SubmitIntake)
 
 	t.Run("Valid Text Intake", func(t *testing.T) {
 		// Mock finding the demo user
-		userID := uuid.New()
-		userRows := sqlmock.NewRows([]string{"id"}).AddRow(userID)
-		mock.ExpectQuery(`SELECT \* FROM "users" ORDER BY "users"\."id" LIMIT \$1`).
-			WithArgs(1).
+		userRows := sqlmock.NewRows([]string{"id", "gemini_api_key"}).AddRow(uuid.New(), "key")
+		mock.ExpectQuery(`SELECT \* FROM "users" WHERE id = \$1 ORDER BY "users"\."id" LIMIT \$2`).
 			WillReturnRows(userRows)
 
 		// Mock creating the intake
@@ -50,8 +61,6 @@ func TestSubmitIntake(t *testing.T) {
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
 		_ = writer.WriteField("raw_text", "test input")
-		_ = writer.WriteField("has_audio", "false")
-		_ = writer.WriteField("has_image", "false")
 		writer.Close()
 
 		w := httptest.NewRecorder()
@@ -75,8 +84,9 @@ func TestUpdateIntakeResults(t *testing.T) {
 	mock, err := db.SetupMockDB()
 	assert.NoError(t, err)
 
+	h := setupIntakeHandler(t)
 	r := gin.Default()
-	r.PATCH("/intake/:id/confirm", handlers.UpdateIntakeResults)
+	r.PATCH("/intake/:id/confirm", h.UpdateIntakeResults)
 
 	t.Run("Valid Update", func(t *testing.T) {
 		intakeID := uuid.New()
@@ -90,10 +100,14 @@ func TestUpdateIntakeResults(t *testing.T) {
 			"tone_profile": "casual",
 		})
 
+		// Mock internal key
+		internalKey := "test_key"
+		t.Setenv("INTERNAL_SERVICE_KEY", internalKey)
+
 		// Mock updating intake status
 		mock.ExpectBegin()
 		mock.ExpectExec(`UPDATE "intakes" SET "status"=\$1,"updated_at"=\$2 WHERE id = \$3`).
-			WithArgs("COMPLETED", sqlmock.AnyArg(), intakeID).
+			WithArgs("COMPLETED", sqlmock.AnyArg(), intakeID.String()).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 		mock.ExpectCommit()
 
@@ -106,6 +120,7 @@ func TestUpdateIntakeResults(t *testing.T) {
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest("PATCH", "/intake/"+intakeID.String()+"/confirm", bytes.NewBuffer(reqBody))
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Internal-Service-Key", internalKey)
 
 		r.ServeHTTP(w, req)
 

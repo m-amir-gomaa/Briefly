@@ -59,8 +59,8 @@
   # Tailscale service
   services.tailscale.enable = true;
 
-  # Disable firewall entirely for the fortress VM
-  networking.firewall.enable = false;
+  # Enable firewall entirely for the fortress VM
+  networking.firewall.enable = true;
 
   # Time synchronization (CRITICAL for CockroachDB distributed consistency)
   services.chrony.enable = true;
@@ -78,11 +78,32 @@
 
   # Port forwards — NixOS wires these through the default user-mode NIC safely.
   # SSH: host 2223 → guest 22
-  # HTTP: host 8080 → guest 80
+  # HTTP: host 9999 → guest 80
   virtualisation.forwardPorts = [
     { from = "host"; host.port = 2223; guest.port = 22; }
     { from = "host"; host.port = 9999; guest.port = 80; }
   ];
+
+  # Mount the workspace directly into the VM
+  virtualisation.sharedDirectories = {
+    workspace = {
+      source = "/home/qwerty/Briefly";
+      target = "/opt/briefly";
+    };
+  };
+
+  # Automatically run Tailscale Funnel in the background
+  systemd.services.tailscale-funnel = {
+    description = "Tailscale Funnel to port 80";
+    after = [ "tailscaled.service" ];
+    wants = [ "tailscaled.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.tailscale}/bin/tailscale funnel 80";
+      Restart = "on-failure";
+      Type = "simple";
+    };
+  };
 
   # QEMU Guest Agent for better host integration
   services.qemuGuest.enable = true;

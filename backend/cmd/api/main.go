@@ -1,18 +1,22 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-	"context"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/softworks/briefly-backend/internal/db"
 	"github.com/softworks/briefly-backend/internal/handlers"
 	"github.com/softworks/briefly-backend/internal/models"
+	"github.com/softworks/briefly-backend/internal/repository"
+	"github.com/softworks/briefly-backend/internal/service"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -31,23 +35,13 @@ func main() {
 		log.Printf("Migration warning: %v. Continuing initialization...", err)
 	}
 
-	// Create default user for demo
-	var user models.User
-	if err := db.DB.Where("email = ?", "demo@softworks.ai").First(&user).Error; err != nil {
-		user = models.User{
-			Email:        "demo@softworks.ai",
-			AgencyName:   "Softworks Studio",
-			PasswordHash: "hashed_password", // Placeholder
-			GeminiAPIKey: os.Getenv("BRIEFLY_DEMO_GEMINI_API_KEY"),
-		}
-		db.DB.Create(&user)
-		log.Printf("Created default demo user: %s with custom API key", user.ID)
-	} else {
-		// Update existing demo user key if env var is set
-		if key := os.Getenv("BRIEFLY_DEMO_GEMINI_API_KEY"); key != "" {
-			db.DB.Model(&user).Update("gemini_api_key", key)
-		}
-	}
+	ensureDemoUser("demo@briefly.ai", "Briefly Demo")
+	ensureDemoUser("demo@softworks.ai", "Softworks Studio")
+	
+	// Initialize Repository & Service Layers
+	intakeRepo := repository.NewIntakeRepository(db.DB)
+	intakeSvc := service.NewIntakeService(intakeRepo, db.Redis)
+	intakeHandler := handlers.NewIntakeHandler(intakeSvc, intakeRepo)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -80,19 +74,22 @@ func main() {
 			{
 				authProtected.GET("/me", handlers.GetMe)
 				authProtected.PATCH("/me", handlers.UpdateProfile)
-				authProtected.GET("/intakes", handlers.ListIntakes)
-				authProtected.GET("/briefs", handlers.ListBriefs)
-				authProtected.POST("/intake", handlers.SubmitIntake)
-				authProtected.GET("/intake/:id", handlers.GetIntakeStatus)
-
-				// Billing routes
-				authProtected.POST("/billing/create-checkout", handlers.CreateCheckoutSession)
 			}
+		}
+
+		protected := v1.Group("")
+		protected.Use(handlers.AuthMiddleware())
+		{
+			protected.GET("/intakes", intakeHandler.ListIntakes)
+			protected.GET("/briefs", handlers.ListBriefs)
+			protected.POST("/intake", intakeHandler.SubmitIntake)
+			protected.GET("/intake/:id", intakeHandler.GetIntakeStatus)
+			protected.POST("/billing/create-checkout", handlers.CreateCheckoutSession)
 		}
 
 		// Webhooks (unprotected)
 		v1.POST("/billing/webhook", handlers.StripeWebhook)
-		v1.PATCH("/intake/:id/confirm", handlers.UpdateIntakeResults)
+		v1.PATCH("/intake/:id/confirm", intakeHandler.UpdateIntakeResults)
 
 		// Public Brief routes
 		v1.GET("/public/brief/:token", handlers.GetPublicBrief)
@@ -100,6 +97,9 @@ func main() {
 
 		// SSE endpoint
 		v1.GET("/events/:intake_id", handlers.SSEHandler)
+
+		// Metrics endpoint
+		r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	}
 
 	// Create server
@@ -136,4 +136,44 @@ func main() {
 	}
 
 	log.Println("Server exiting")
+}
+
+func ensureDemoUser(email, agencyName string) {
+	apiKey := os.Getenv("BRIEFLY_DEMO_GEMINI_API_KEY")
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte("briefly-demo"), bcrypt.DefaultCost)
+	if err != nil {
+		log.Printf("Failed to hash demo password for %s: %v", email, err)
+		return
+	}
+
+	var user models.User
+	if err := db.DB.Where("email = ?", email).First(&user).Error; err != nil {
+		user = models.User{
+			Email:        email,
+			AgencyName:   agencyName,
+			PasswordHash: string(passwordHash),
+			GeminiAPIKey: apiKey,
+			PlanTier:     "free",
+		}
+		if err := db.DB.Create(&user).Error; err != nil {
+			log.Printf("Failed to create demo user %s: %v", email, err)
+			return
+		}
+		log.Printf("Created default demo user: %s", email)
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if user.PasswordHash == "" || user.PasswordHash == "hashed_password" {
+		updates["password_hash"] = string(passwordHash)
+	}
+	if apiKey != "" {
+		updates["gemini_api_key"] = apiKey
+	}
+	if user.PlanTier == "" {
+		updates["plan_tier"] = "free"
+	}
+	if len(updates) > 0 {
+		db.DB.Model(&user).Updates(updates)
+	}
 }

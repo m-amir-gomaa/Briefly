@@ -22,9 +22,9 @@ class GeminiProvider:
             google_api_key=self.api_key,
         )
 
-    async def invoke_with_backoff(self, chain, inputs: dict, max_retries: int = 5) -> dict:
+    async def invoke_with_backoff(self, chain, inputs: dict, max_retries: int = 2) -> dict:
         """Invoke a LangChain chain with exponential backoff for rate limits."""
-        delay = 30
+        delay = 5
         last_error = None
         for attempt in range(max_retries):
             try:

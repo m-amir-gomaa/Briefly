@@ -22,6 +22,7 @@ AI_PROVIDER_NAME = os.getenv("AI_PROVIDER", "gemini")
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 API_URL = os.getenv("API_URL", "http://localhost:8080")
+INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "briefly_internal_secret_key")
 
 # S3 / MinIO Configuration
 S3_ENDPOINT = os.getenv("S3_ENDPOINT", "localhost:9000")
@@ -68,8 +69,54 @@ class IntakeState(TypedDict):
     tone_profile: str
     retry_count: int
     gemini_api_key: Optional[str]
+    provider_name: str
 
 # --- Node Functions ---
+
+def apply_fallback_analysis(state: IntakeState) -> None:
+    context = (state.get("unified_context") or "the submitted project context").replace("USER TEXT:", "").strip()
+    short_context = context[:220] + ("..." if len(context) > 220 else "")
+    state["summary"] = f"Draft brief generated from the submitted intake: {short_context}"
+    state["goals"] = [
+        {"title": "Clarify scope", "detail": "Turn the submitted context into agreed deliverables, owners, and acceptance criteria."},
+        {"title": "Plan execution", "detail": "Define the timeline, dependencies, and milestones needed to move the project forward."},
+        {"title": "Measure success", "detail": "Choose practical metrics that show whether the finished work meets the client need."},
+    ]
+    state["success_criteria"] = [
+        "Stakeholders approve the brief and scope before production starts.",
+        "Delivery milestones are mapped to target dates and responsible owners.",
+        "Risks and open questions are resolved or explicitly accepted.",
+    ]
+    state["constraints"] = [
+        "Timeline and budget require confirmation from the project owner.",
+        "Any technical integrations should be validated before final commitment.",
+        "Provider-generated analysis can be re-run when the AI provider is available.",
+    ]
+
+
+def apply_fallback_ambiguity(state: IntakeState) -> None:
+    state["ambiguities"] = [
+        {
+            "field_missing": "Budget",
+            "reason": "The intake does not provide an approved budget range.",
+            "suggested_question": "What budget range should the team plan around?",
+        },
+        {
+            "field_missing": "Timeline",
+            "reason": "The target launch or delivery date needs confirmation.",
+            "suggested_question": "What date should the first usable version be ready?",
+        },
+        {
+            "field_missing": "Decision maker",
+            "reason": "Final approval ownership is not explicit.",
+            "suggested_question": "Who signs off on scope and final delivery?",
+        },
+    ]
+    state["followup_questions"] = [
+        "What budget range should guide the project plan?",
+        "What is the target launch or delivery date?",
+        "Who is responsible for final approval?",
+    ]
 
 async def node_ingest(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Ingest - Starting pipeline (provider={AI_PROVIDER_NAME})")
@@ -166,7 +213,13 @@ async def node_merge(state: IntakeState) -> IntakeState:
 
 async def node_analyze(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Analyze")
+    if AI_PROVIDER_NAME in ("fallback", "offline"):
+        apply_fallback_analysis(state)
+        state["provider_name"] = "Fallback/Offline"
+        return state
+
     provider = get_provider(state.get("gemini_api_key"))
+    state["provider_name"] = f"{type(provider).__name__.replace('Provider', '')}"
     parser = JsonOutputParser()
     prompt = ChatPromptTemplate.from_template("""
 You are Briefly AI, a professional project consultant.
@@ -195,11 +248,16 @@ Ensure your output is ONLY valid JSON containing:
         state["constraints"] = res.get("constraints", [])
     except Exception as e:
         print(f"[{state['intake_id']}] Extraction Error: {e}")
-        state["summary"] = "AI was unable to generate a summary."
+        # We no longer silently fallback. We re-raise to let the pipeline fail visibly.
+        raise e
     return state
 
 async def node_ambiguity(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Ambiguity Review")
+    if AI_PROVIDER_NAME in ("fallback", "offline"):
+        apply_fallback_ambiguity(state)
+        return state
+
     provider = get_provider(state.get("gemini_api_key"))
     parser = JsonOutputParser()
     prompt = ChatPromptTemplate.from_template("""
@@ -225,6 +283,8 @@ Ensure your output is ONLY valid JSON containing:
         state["followup_questions"] = res.get("followup_questions", [])
     except Exception as e:
         print(f"[{state['intake_id']}] Ambiguity Error: {e}")
+        # Explicit error propagation
+        raise e
     return state
 
 async def node_tone(state: IntakeState) -> IntakeState:
@@ -247,11 +307,13 @@ async def node_finalize(state: IntakeState) -> IntakeState:
         "tone_profile": state["tone_profile"],
         "confidence_score": 0.95,
         "is_confirmed": False,
+        "cot_log": f"Engine: {state.get('provider_name', 'Unknown')}",
     }
     async with httpx.AsyncClient() as client:
         try:
             url = f"{API_URL}/api/v1/intake/{state['intake_id']}/confirm"
-            resp = await client.patch(url, json=final_payload)
+            headers = {"Internal-Service-Key": INTERNAL_SERVICE_KEY}
+            resp = await client.patch(url, json=final_payload, headers=headers)
             if resp.status_code == 200:
                 print(f"[{state['intake_id']}] Successfully saved brief.")
                 rc = await get_redis_client()
@@ -325,5 +387,6 @@ async def run_pipeline(payload: dict):
         tone_profile="",
         retry_count=0,
         gemini_api_key=payload.get("gemini_api_key"),
+        provider_name="Unknown",
     )
     await app_graph.ainvoke(state)

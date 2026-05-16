@@ -16,6 +16,11 @@ CREATE TABLE users (
     email        TEXT NOT NULL UNIQUE,
     agency_name  TEXT,
     password_hash TEXT NOT NULL,
+    gemini_api_key TEXT,
+    google_id    TEXT UNIQUE,
+    avatar_url   TEXT,
+    plan_tier    TEXT NOT NULL DEFAULT 'free',
+    stripe_customer_id TEXT,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

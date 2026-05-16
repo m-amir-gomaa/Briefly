@@ -37,21 +37,20 @@ The most expensive part of the system is Gemini AI inference. We must protect it
     *   Limit: 5 requests per 5 minutes per IP.
     *   Action: Managed Challenge.
 *   **Cache Headers**: Configure Cloudflare to cache all Vite static assets (`/assets/*`) at edge nodes. **NOT `/_next/static/*`** — we use Vite, not Next.js.
-*   **Direct IP Lock**: Configure Nginx to reject traffic that does not include `CF-Connecting-IP` from Cloudflare.
+*   **Direct IP Lock**: Configure Caddy to reject traffic that does not include `CF-Connecting-IP` from Cloudflare.
 
 ---
 
-## 4. Real-Time Streaming & Nginx
+## 4. Real-Time Streaming & Caddy
 We use **Server-Sent Events (SSE)**, not WebSockets or WebTransport.
-*   **SSE Fix**: In `infra/nginx/nginx.conf`, the `/events/` location block MUST have:
-    ```nginx
-    proxy_buffering off;
-    proxy_set_header Connection '';
-    proxy_http_version 1.1;
-    chunked_transfer_encoding on;
+*   **SSE Fix**: In `infra/caddy/Caddyfile`, the `/api/v1/events/*` route MUST use:
+    ```caddy
+    reverse_proxy {$API_UPSTREAM:http://api-alpha:8080} {
+        flush_interval -1
+    }
     ```
     Without this, the browser's `EventSource` will appear broken and deliver events in batches instead of streaming them live.
-*   **Load Balancing**: Use an Nginx `upstream` block to round-robin between `api-alpha:8080` and `api-beta:8080`.
+*   **Gateway**: Use the `caddy` service in Compose for all demo and mesh traffic. Local VM sets `API_UPSTREAM=http://api:8080`; distributed mesh sets `API_UPSTREAM=http://api-alpha:8080`.
 
 ---
 
@@ -83,7 +82,7 @@ We do NOT store uploaded files on VPS disk.
 - [ ] `flake.lock` is committed and up to date.
 - [ ] `docker-compose.distributed.yml` health checks pass on all 5 nodes.
 - [ ] Cloudflare WAF Token Bucket is active on `POST /api/v1/intake`.
-- [ ] Nginx `proxy_buffering off` is set for the `/events/` route (SSE).
+- [ ] Caddy `flush_interval -1` is set for the `/api/v1/events/*` route (SSE).
 - [ ] `GOGC=200` is set in the production env for the Go API.
 - [ ] `REDIS_CLUSTER_MODE=true` is set on all production nodes.
 - [ ] `GOOGLE_API_KEY` is injected via sops-nix (NOT plaintext in `.env`).

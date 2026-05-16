@@ -9,9 +9,9 @@ services:
     container_name: briefly_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-briefly}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-briefly_secret}
-      POSTGRES_DB: ${DB_NAME:-briefly_db}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
@@ -51,14 +51,15 @@ services:
     container_name: briefly_api
     restart: unless-stopped
     environment:
-      DATABASE_URL: "postgres://${DB_USER:-briefly}:${DB_PASSWORD:-briefly_secret}@postgres:5432/${DB_NAME:-briefly_db}?sslmode=disable"
+      DATABASE_URL: "postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable"
       REDIS_URL: "redis://redis:6379"
       AI_SERVICE_URL: "http://ai_worker:8001"
-      JWT_SECRET: "${JWT_SECRET:-briefly_jwt_secret_change_me}"
+      JWT_SECRET: "${JWT_SECRET}"
+      INTERNAL_SERVICE_KEY: "${INTERNAL_SERVICE_KEY:-briefly_internal_secret_key}"
       # S3/MinIO Config
       S3_ENDPOINT: "minio:9000"
-      S3_ACCESS_KEY: "${MINIO_USER:-briefly_admin}"
-      S3_SECRET_KEY: "${MINIO_PASSWORD:-briefly_storage_secret}"
+      S3_ACCESS_KEY: "${MINIO_USER}"
+      S3_SECRET_KEY: "${MINIO_PASSWORD}"
       S3_BUCKET: "briefly-media"
       PORT: "8080"
       ENV: "development"
@@ -84,8 +85,8 @@ services:
     command: server /data --console-address ":9001"
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: ${MINIO_USER:-briefly_admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-briefly_storage_secret}
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -104,11 +105,15 @@ services:
     environment:
       REDIS_URL: "redis://redis:6379"
       API_URL: "http://api:8080"
-      GOOGLE_API_KEY: "${GOOGLE_API_KEY:-dummy}"
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
+      INTERNAL_SERVICE_KEY: "${INTERNAL_SERVICE_KEY:-briefly_internal_secret_key}"
       # S3/MinIO Config (AI needs to read images)
       S3_ENDPOINT: "minio:9000"
-      S3_ACCESS_KEY: "${MINIO_USER:-briefly_admin}"
-      S3_SECRET_KEY: "${MINIO_PASSWORD:-briefly_storage_secret}"
+      S3_ACCESS_KEY: "${MINIO_USER}"
+      S3_SECRET_KEY: "${MINIO_PASSWORD}"
+      AI_PROVIDER: "${AI_PROVIDER:-gemini}"
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "${OLLAMA_MODEL:-mistral}"
     depends_on:
       redis:
         condition: service_healthy
@@ -128,21 +133,82 @@ services:
       - api
 
   # ─────────────────────────────────────────────
-  # Nginx Reverse Proxy (mirrors production)
+  # Caddy Reverse Proxy (demo gateway)
   # ─────────────────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    container_name: briefly_nginx
+  caddy:
+    image: caddy:alpine
+    container_name: briefly_caddy
     restart: unless-stopped
+    environment:
+      API_UPSTREAM: "http://api:8080"
+      FRONTEND_UPSTREAM: "http://frontend:80"
     ports:
       - "80:80"
     volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - api
+      - frontend
+
+  # ─────────────────────────────────────────────
+  # Auto-Deployment (Watchtower)
+  # ─────────────────────────────────────────────
+  watchtower:
+    image: containrrr/watchtower
+    container_name: briefly_watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 300 --cleanup
+    environment:
+      - WATCHTOWER_CLEANUP=true
+
+  # ─────────────────────────────────────────────
+  # Monitoring (Prometheus & Grafana)
+  # ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: briefly_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: briefly_grafana
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD:-admin}
+    depends_on:
+      - prometheus
+
+  # ─────────────────────────────────────────────
+  # Ollama — Local LLM Inference
+  # ─────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: briefly_ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
 
 volumes:
   postgres_data:
   redis_data:
   media_data:
   minio_data:
+  prometheus_data:
+  grafana_data:
+  ollama_data:

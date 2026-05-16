@@ -134,5 +134,5 @@ Before writing any code, read your team role's cookbook:
 | `go mod download` fails at build | `rm backend/go.sum && docker compose build` — the Dockerfile runs `go mod tidy` |
 | Worker crashes with `NameError` | Make sure all state references use `IntakeState`, not `ShipmentState` |
 | API can't reach DB | Check `DATABASE_URL` in `.env` points to the Alpha node's CockroachDB |
-| SSE events not streaming | Check Nginx has `proxy_buffering off` on the `/events/` location block |
+| SSE events not streaming | Check Caddy has `flush_interval -1` on the `/api/v1/events/*` route |
 | Git LFS hook errors | `rm -f .git/hooks/post-checkout` then re-run the git command |

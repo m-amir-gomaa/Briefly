@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'briefly-api'
+    static_configs:
+      - targets: ['api:8080']
+    metrics_path: '/metrics' # Note: Ensure Go backend exposes this endpoint
+
+  - job_name: 'briefly-worker'
+    static_configs:
+      - targets: ['ai_worker:8001']
+    metrics_path: '/metrics' # Note: Ensure Python worker exposes this endpoint

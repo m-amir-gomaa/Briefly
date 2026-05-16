@@ -19,6 +19,7 @@ import (
 func TestLogin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	os.Setenv("JWT_SECRET", "test_secret") // Needed for token generation
+	passwordHash, _ := handlers.HashPassword("password")
 
 	mock, err := db.SetupMockDB()
 	assert.NoError(t, err)
@@ -35,7 +36,7 @@ func TestLogin(t *testing.T) {
 		userID := uuid.New()
 		
 		rows := sqlmock.NewRows([]string{"id", "email", "password_hash"}).
-			AddRow(userID, "test@test.com", "hash")
+			AddRow(userID, "test@test.com", passwordHash)
 			
 		mock.ExpectQuery(`SELECT \* FROM "users" WHERE email = \$1 ORDER BY "users"\."id" LIMIT \$2`).
 			WithArgs("test@test.com", 1).

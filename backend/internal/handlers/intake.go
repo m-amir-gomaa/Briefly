@@ -3,17 +3,31 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"time"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/softworks/briefly-backend/internal/db"
 	"github.com/softworks/briefly-backend/internal/models"
+	"github.com/softworks/briefly-backend/internal/repository"
+	"github.com/softworks/briefly-backend/internal/service"
 )
 
+type IntakeHandler struct {
+	svc  service.IntakeService
+	repo repository.IntakeRepository
+}
+
+func NewIntakeHandler(svc service.IntakeService, repo repository.IntakeRepository) *IntakeHandler {
+	return &IntakeHandler{
+		svc:  svc,
+		repo: repo,
+	}
+}
+
 // SubmitIntake handles POST /api/v1/intake
-func SubmitIntake(c *gin.Context) {
+func (h *IntakeHandler) SubmitIntake(c *gin.Context) {
 	// Parse multi-part form
 	err := c.Request.ParseMultipartForm(25 << 20) // 25 MB max memory
 	if err != nil {
@@ -22,76 +36,48 @@ func SubmitIntake(c *gin.Context) {
 	}
 
 	rawText := c.PostForm("raw_text")
-	
-	userID, exists := c.Get("user_id")
+
+	userIDVal, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
 		return
 	}
+	userIDStr := userIDVal.(string)
+	userID, _ := uuid.Parse(userIDStr)
 
 	var user models.User
 	if err := db.DB.First(&user, "id = ?", userID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find user"})
 		return
 	}
-	
-	intakeType := models.IntakeTypeText
-	if c.PostForm("has_audio") == "true" {
-		intakeType = models.IntakeTypeVoice
-	} else if c.PostForm("has_image") == "true" {
-		intakeType = models.IntakeTypeImage
-	}
 
-	intake := models.Intake{
-		UserID:  user.ID,
-		Type:    intakeType,
-		RawText: rawText,
-		Status:  models.IntakeStatusPending,
-	}
+	var audioKey, imageKey string
 
-	// 1. Upload files to MinIO
+	// 1. Upload files to MinIO (This part could also be in service, but handlers often handle the multipart complexity)
 	audioFile, audioHeader, err := c.Request.FormFile("audio_file")
 	if err == nil {
 		defer audioFile.Close()
-		key := uuid.New().String() + "-" + audioHeader.Filename
-		_, err = db.S3.PutObject(c, db.GetBucketName(), key, audioFile, audioHeader.Size, minio.PutObjectOptions{
+		audioKey = uuid.New().String() + "-" + audioHeader.Filename
+		_, err = db.S3.PutObject(c, db.GetBucketName(), audioKey, audioFile, audioHeader.Size, minio.PutObjectOptions{
 			ContentType: audioHeader.Header.Get("Content-Type"),
 		})
-		if err == nil {
-			intake.AudioURL = key
-		}
 	}
 
 	imageFile, imageHeader, err := c.Request.FormFile("image_file")
 	if err == nil {
 		defer imageFile.Close()
-		key := uuid.New().String() + "-" + imageHeader.Filename
-		_, err = db.S3.PutObject(c, db.GetBucketName(), key, imageFile, imageHeader.Size, minio.PutObjectOptions{
+		imageKey = uuid.New().String() + "-" + imageHeader.Filename
+		_, err = db.S3.PutObject(c, db.GetBucketName(), imageKey, imageFile, imageHeader.Size, minio.PutObjectOptions{
 			ContentType: imageHeader.Header.Get("Content-Type"),
 		})
-		if err == nil {
-			intake.ImageURL = key
-		}
 	}
 
-	// 2. Save to CockroachDB
-	if err := db.DB.Create(&intake).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save intake"})
+	// 2. Delegate business logic to service
+	intake, err := h.svc.Submit(c, userID, rawText, audioKey, imageKey, user.GeminiAPIKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process intake"})
 		return
 	}
-
-	// 3. Enqueue job to Redis
-	jobPayload, _ := json.Marshal(map[string]interface{}{
-		"intake_id":      intake.ID,
-		"type":           intake.Type,
-		"audio_url":      intake.AudioURL,
-		"image_url":      intake.ImageURL,
-		"raw_text":       intake.RawText,
-		"gemini_api_key": user.GeminiAPIKey,
-		"enqueued_at":    time.Now().Format(time.RFC3339),
-	})
-	
-	db.Redis.LPush(db.Ctx, "intake:queue", jobPayload)
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"intake_id": intake.ID,
@@ -100,17 +86,24 @@ func SubmitIntake(c *gin.Context) {
 }
 
 // GetIntakeStatus handles GET /api/v1/intake/:id
-func GetIntakeStatus(c *gin.Context) {
+func (h *IntakeHandler) GetIntakeStatus(c *gin.Context) {
 	idStr := c.Param("id")
-	id, err := uuid.Parse(idStr)
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+		return
+	}
+	userID := userIDVal.(string)
+
+	intake, err := h.repo.GetByID(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Intake not found"})
 		return
 	}
 
-	var intake models.Intake
-	if err := db.DB.Preload("Brief").First(&intake, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Intake not found"})
+	// Verify the intake belongs to the authenticated user
+	if intake.UserID.String() != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden to access this intake"})
 		return
 	}
 
@@ -118,8 +111,15 @@ func GetIntakeStatus(c *gin.Context) {
 }
 
 // UpdateIntakeResults handles PATCH /api/v1/intake/:id/confirm
-// This is called by the AI service to update the intake status and create the brief.
-func UpdateIntakeResults(c *gin.Context) {
+func (h *IntakeHandler) UpdateIntakeResults(c *gin.Context) {
+	// Internal Service Authentication
+	internalKey := c.GetHeader("Internal-Service-Key")
+	expectedKey := os.Getenv("INTERNAL_SERVICE_KEY")
+	if expectedKey == "" || internalKey != expectedKey {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized internal service call"})
+		return
+	}
+
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -128,13 +128,13 @@ func UpdateIntakeResults(c *gin.Context) {
 	}
 
 	var req struct {
-		Summary           string                 `json:"summary"`
-		Goals             []models.Goal          `json:"goals"`
-		SuccessCriteria   []string               `json:"success_criteria"`
-		Ambiguities       []models.Ambiguity     `json:"ambiguities"`
-		FollowupQuestions []string               `json:"followup_questions"`
-		ToneProfile       string                 `json:"tone_profile"`
-		ConfidenceScore   float32                `json:"confidence_score"`
+		Summary           string             `json:"summary"`
+		Goals             []models.Goal      `json:"goals"`
+		SuccessCriteria   []string           `json:"success_criteria"`
+		Ambiguities       []models.Ambiguity `json:"ambiguities"`
+		FollowupQuestions []string           `json:"followup_questions"`
+		ToneProfile       string             `json:"tone_profile"`
+		ConfidenceScore   float32            `json:"confidence_score"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -142,8 +142,8 @@ func UpdateIntakeResults(c *gin.Context) {
 		return
 	}
 
-	// 1. Update Intake status
-	if err := db.DB.Model(&models.Intake{}).Where("id = ?", id).Update("status", models.IntakeStatusCompleted).Error; err != nil {
+	// 1. Update Intake status via Repo
+	if err := h.repo.UpdateStatus(idStr, models.IntakeStatusCompleted); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update intake status"})
 		return
 	}
@@ -153,7 +153,7 @@ func UpdateIntakeResults(c *gin.Context) {
 	ambiguitiesJSON, _ := json.Marshal(req.Ambiguities)
 	questionsJSON, _ := json.Marshal(req.FollowupQuestions)
 
-	// 2. Create Brief
+	// 2. Create Brief (Normally this would also be in a service/repo, but keeping it simplified for the intake demo)
 	brief := models.Brief{
 		IntakeID:          id,
 		Summary:           req.Summary,
@@ -175,15 +175,16 @@ func UpdateIntakeResults(c *gin.Context) {
 }
 
 // ListIntakes handles GET /api/v1/intakes
-func ListIntakes(c *gin.Context) {
-	userID, exists := c.Get("user_id")
+func (h *IntakeHandler) ListIntakes(c *gin.Context) {
+	userIDVal, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
 		return
 	}
+	userID := userIDVal.(string)
 
-	var intakes []models.Intake
-	if err := db.DB.Preload("Brief").Where("user_id = ?", userID).Order("created_at desc").Find(&intakes).Error; err != nil {
+	intakes, err := h.repo.ListByUserID(userID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch intakes"})
 		return
 	}

@@ -55,7 +55,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: ghcr.io/m-amir-gomaa/briefly-api:latest
+    image: briefly-api:local
     container_name: api-alpha
     environment:
       DATABASE_URL: "postgres://root@${PRIMARY_NODE_IP:-crdb-alpha}:26257/defaultdb?sslmode=disable"
@@ -65,6 +65,7 @@ services:
       S3_SECRET_KEY: briefly_storage_secret
       S3_BUCKET: "briefly-intake"
       BRIEFLY_DEMO_GEMINI_API_KEY: "${BRIEFLY_DEMO_GEMINI_API_KEY}"
+      JWT_SECRET: "${JWT_SECRET:-briefly_jwt_secret_change_me}"
       PORT: "8080"
       WORKER_ID: "node-alpha"
     ports:
@@ -81,7 +82,7 @@ services:
     build:
       context: ./ai_service
       dockerfile: Dockerfile
-    image: ghcr.io/m-amir-gomaa/briefly-worker:latest
+    image: briefly-worker:local
     container_name: worker-alpha
     environment:
       REDIS_URL: "redis://redis-alpha:6379"
@@ -105,7 +106,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: ghcr.io/m-amir-gomaa/briefly-api:latest
+    image: briefly-api:local
     container_name: api-beta
     environment:
       DATABASE_URL: "postgres://root@${PRIMARY_NODE_IP:-crdb-alpha}:26257/defaultdb?sslmode=disable"
@@ -114,6 +115,7 @@ services:
       S3_ACCESS_KEY: briefly_admin
       S3_SECRET_KEY: briefly_storage_secret
       BRIEFLY_DEMO_GEMINI_API_KEY: "${BRIEFLY_DEMO_GEMINI_API_KEY}"
+      JWT_SECRET: "${JWT_SECRET:-briefly_jwt_secret_change_me}"
       PORT: "8081"
       WORKER_ID: "node-beta"
     ports:
@@ -131,7 +133,7 @@ services:
     build:
       context: ./ai_service
       dockerfile: Dockerfile
-    image: ghcr.io/m-amir-gomaa/briefly-worker:latest
+    image: briefly-worker:local
     container_name: worker-beta
     environment:
       REDIS_URL: "redis://${PRIMARY_NODE_IP:-redis-alpha}:6379"
@@ -151,7 +153,10 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/m-amir-gomaa/briefly-frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: briefly-frontend:local
     container_name: briefly-ui
     ports:
       - "6568:80"
@@ -163,6 +168,9 @@ services:
     image: caddy:alpine
     container_name: briefly-caddy
     restart: unless-stopped
+    environment:
+      API_UPSTREAM: "http://api-alpha:8080"
+      FRONTEND_UPSTREAM: "http://frontend:80"
     ports:
       - "80:80"
     volumes:
