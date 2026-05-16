@@ -256,16 +256,19 @@ async def node_analyze(state: IntakeState) -> IntakeState:
     # Use StrOutputParser for robustness — tinyllama may not output clean JSON
     str_parser = StrOutputParser()
     prompt = ChatPromptTemplate.from_template("""
-You are a project consultant. Extract a structured brief from the context.
-Respond with ONLY a valid JSON object — no explanation, no markdown, just JSON.
+Extract a project brief as JSON from the context below. Replace all values with real content from the context.
 
 CONTEXT: {context}
 
-JSON format (respond ONLY with this, filled in):
-{{"summary": "2-sentence executive summary here",
-  "goals": [{{"title": "Goal 1", "detail": "Detail here"}}, {{"title": "Goal 2", "detail": "Detail here"}}, {{"title": "Goal 3", "detail": "Detail here"}}],
-  "success_criteria": ["KPI 1", "KPI 2", "KPI 3"],
-  "constraints": ["Budget/time constraint", "Technical constraint", "Scope constraint"]}}
+Respond with ONLY valid JSON in this exact structure (fill every value based on the CONTEXT above):
+{{"summary": "<write a 2-sentence executive summary of the project>",
+  "goals": [
+    {{"title": "<first goal title>", "detail": "<one sentence describing this goal>"}},
+    {{"title": "<second goal title>", "detail": "<one sentence describing this goal>"}},
+    {{"title": "<third goal title>", "detail": "<one sentence describing this goal>"}}
+  ],
+  "success_criteria": ["<measurable KPI 1>", "<measurable KPI 2>", "<measurable KPI 3>"],
+  "constraints": ["<budget or time constraint>", "<technical constraint>", "<scope or resource constraint>"]}}
 """)
 
     async def _invoke(p):
