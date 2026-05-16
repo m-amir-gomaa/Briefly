@@ -55,6 +55,7 @@ func GoogleLogin(c *gin.Context) {
 
 	// Store state in a short-lived cookie for CSRF protection
 	secure := os.Getenv("ENV") == "production" || os.Getenv("ENV") == "staging"
+	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie("oauth_state", state, 600, "/", "", secure, true)
 
 	url := googleOAuthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
@@ -136,6 +137,7 @@ func GoogleCallback(c *gin.Context) {
 	}
 
 	secure := os.Getenv("ENV") == "production" || os.Getenv("ENV") == "staging"
+	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie("auth_token", tokenString, 86400*7, "/", "", secure, true)
 
 	// Redirect to the frontend dashboard

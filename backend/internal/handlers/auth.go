@@ -13,7 +13,13 @@ import (
 	"github.com/softworks/briefly-backend/internal/models"
 )
 
-var jwtKey = []byte(os.Getenv("JWT_SECRET"))
+func getJWTKey() []byte {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return []byte("default_secret_key_for_dev")
+	}
+	return []byte(secret)
+}
 
 // Register handles POST /api/v1/auth/register
 func Register(c *gin.Context) {
@@ -60,7 +66,9 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("auth_token", tokenString, 86400*7, "/", "", false, true)
+	secure := os.Getenv("ENV") == "production" || os.Getenv("ENV") == "staging"
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("auth_token", tokenString, 86400*7, "/", "", secure, true)
 	c.JSON(http.StatusCreated, gin.H{"message": "Account created", "user": user})
 }
 
@@ -96,7 +104,9 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("auth_token", tokenString, 86400*7, "/", "", false, true)
+	secure := os.Getenv("ENV") == "production" || os.Getenv("ENV") == "staging"
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("auth_token", tokenString, 86400*7, "/", "", secure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful", "user": user})
 }
 
@@ -132,7 +142,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, gin.Error{Err: nil}
 			}
-			return jwtKey, nil
+			return getJWTKey(), nil
 		})
 
 		if err != nil || !token.Valid {
@@ -166,7 +176,7 @@ func issueJWTFromClaims(userID interface{}, email, plan string) (string, error) 
 		"exp":     expirationTime.Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtKey)
+	return token.SignedString(getJWTKey())
 }
 
 func HashPassword(password string) (string, error) {
