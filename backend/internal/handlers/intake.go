@@ -135,6 +135,8 @@ func (h *IntakeHandler) UpdateIntakeResults(c *gin.Context) {
 		FollowupQuestions []string           `json:"followup_questions"`
 		ToneProfile       string             `json:"tone_profile"`
 		ConfidenceScore   float32            `json:"confidence_score"`
+		CotLog            string             `json:"cot_log"`
+		IsConfirmed       bool               `json:"is_confirmed"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -163,6 +165,8 @@ func (h *IntakeHandler) UpdateIntakeResults(c *gin.Context) {
 		FollowupQuestions: questionsJSON,
 		ToneProfile:       req.ToneProfile,
 		ConfidenceScore:   req.ConfidenceScore,
+		CotLog:            req.CotLog,
+		IsConfirmed:       req.IsConfirmed,
 		ShareToken:        uuid.New().String(),
 	}
 
