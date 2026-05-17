@@ -30,6 +30,7 @@ func main() {
 		&models.Intake{},
 		&models.Brief{},
 		&models.Feedback{},
+		&models.UserAPIKey{},
 	)
 	if err != nil {
 		log.Printf("Migration warning: %v. Continuing initialization...", err)
@@ -74,6 +75,10 @@ func main() {
 			{
 				authProtected.GET("/me", handlers.GetMe)
 				authProtected.PATCH("/me", handlers.UpdateProfile)
+				authProtected.GET("/quota", handlers.GetQuota)
+				authProtected.GET("/keys", handlers.ListKeys)
+				authProtected.POST("/keys", handlers.AddKey)
+				authProtected.DELETE("/keys/:id", handlers.DeleteKey)
 			}
 		}
 
@@ -85,6 +90,7 @@ func main() {
 			protected.POST("/intake", intakeHandler.SubmitIntake)
 			protected.GET("/intake/:id", intakeHandler.GetIntakeStatus)
 			protected.POST("/billing/create-checkout", handlers.CreateCheckoutSession)
+			protected.POST("/billing/create-portal", handlers.CreatePortalSession)
 		}
 
 		// Webhooks (unprotected)
@@ -152,7 +158,6 @@ func ensureDemoUser(email, agencyName string) {
 			Email:        email,
 			AgencyName:   agencyName,
 			PasswordHash: string(passwordHash),
-			GeminiAPIKey: apiKey,
 			PlanTier:     "free",
 		}
 		if err := db.DB.Create(&user).Error; err != nil {

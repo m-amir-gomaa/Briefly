@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CreditCard, Globe, KeyRound, LockKeyhole, Mail, Shield, User, Wand2 } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
@@ -18,21 +18,57 @@ export default function AccountView() {
   const user = useAuthStore((state) => state.user)
   const [activeTab, setActiveTab] = useState<Tab>('profile')
   const [agencyName, setAgencyName] = useState(user?.agency_name || '')
-  const [geminiKey, setGeminiKey] = useState('')
   const [loading, setLoading] = useState(false)
+  const [quota, setQuota] = useState<{ plan: string; limit: number; used: number } | null>(null)
+  const [apiKeys, setApiKeys] = useState<{ id: string; name: string; key_masked: string; usage_count: number }[]>([])
+  const [newKeyName, setNewKeyName] = useState('')
+  const [newKeyValue, setNewKeyValue] = useState('')
+
+  useEffect(() => {
+    import('../services/api').then((api) => {
+      api.getQuota().then(setQuota).catch(console.error)
+      api.getAPIKeys().then(setApiKeys).catch(console.error)
+    })
+  }, [])
 
   const handleUpdateProfile = async () => {
     setLoading(true)
     try {
-      const { updateProfile } = await import('../services/api').then(m => ({ updateProfile: m.updateProfile || m.updateProfile /* fallback if I rename */ }))
-      // Actually I named it UpdateProfile in the backend but I need to check the frontend service.
       const api = await import('../services/api')
-      await api.updateProfile({ agency_name: agencyName, gemini_api_key: geminiKey })
+      await api.updateProfile({ agency_name: agencyName })
       alert('Profile updated successfully!')
-      // Refresh user data
       await useAuthStore.getState().checkAuth()
     } catch (e) {
       alert('Failed to update profile')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAddKey = async () => {
+    if (!newKeyName || !newKeyValue) return
+    setLoading(true)
+    try {
+      const api = await import('../services/api')
+      const newKey = await api.addAPIKey(newKeyName, newKeyValue)
+      setApiKeys((prev) => [...prev, newKey])
+      setNewKeyName('')
+      setNewKeyValue('')
+    } catch (e) {
+      alert('Failed to add API key')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteKey = async (id: string) => {
+    setLoading(true)
+    try {
+      const api = await import('../services/api')
+      await api.deleteAPIKey(id)
+      setApiKeys((prev) => prev.filter((k) => k.id !== id))
+    } catch (e) {
+      alert('Failed to delete API key')
     } finally {
       setLoading(false)
     }
@@ -101,19 +137,6 @@ export default function AccountView() {
                     <Input value={agencyName} onChange={(e) => setAgencyName(e.target.value)} />
                   </label>
                   <label>
-                    <span className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Gemini API Key (Optional)</span>
-                    <div className="relative">
-                      <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                      <Input 
-                        type="password" 
-                        placeholder="Paste your key here" 
-                        className="pl-9" 
-                        value={geminiKey}
-                        onChange={(e) => setGeminiKey(e.target.value)}
-                      />
-                    </div>
-                  </label>
-                  <label>
                     <span className="mb-1.5 block text-xs font-semibold text-zinc-600 dark:text-zinc-400">Email address</span>
                     <div className="relative">
                       <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
@@ -127,9 +150,38 @@ export default function AccountView() {
                   <Button disabled={loading} onClick={handleUpdateProfile}>Save changes</Button>
                 </div>
               </Card>
+
+              <Card>
+                <div className="mb-5">
+                  <h2 className="text-base font-semibold text-zinc-950 dark:text-zinc-100">API Keys</h2>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">Manage your custom Gemini API keys and track their usage.</p>
+                </div>
+
+                <div className="space-y-4">
+                  {apiKeys.map((k) => (
+                    <div key={k.id} className="flex items-center justify-between rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-zinc-900 dark:text-zinc-100">{k.name}</p>
+                          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">{k.key_masked}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                          {k.usage_count} / 1500 daily requests used
+                        </p>
+                      </div>
+                      <Button variant="ghost" onClick={() => handleDeleteKey(k.id)}>Delete</Button>
+                    </div>
+                  ))}
+
+                  <div className="flex gap-3">
+                    <Input placeholder="Key Name (e.g. Production)" value={newKeyName} onChange={e => setNewKeyName(e.target.value)} />
+                    <Input type="password" placeholder="AIzaSy..." value={newKeyValue} onChange={e => setNewKeyValue(e.target.value)} />
+                    <Button onClick={handleAddKey} disabled={loading || !newKeyName || !newKeyValue}>Add Key</Button>
+                  </div>
+                </div>
+              </Card>
             </>
           )}
-
           {/* ─── Security ─── */}
           {activeTab === 'security' && (
             <>
@@ -248,26 +300,41 @@ export default function AccountView() {
                       {user?.plan_tier === 'pro' ? 'Unlimited briefs.' : 'Free tier — 3 briefs per month.'}
                     </p>
                   </div>
-                  <Button 
-                    disabled={user?.plan_tier === 'pro'} 
-                    className="shrink-0"
-                    onClick={async () => {
-                      try {
-                        const { url } = await import('../services/api').then(m => m.createCheckoutSession())
-                        window.location.href = url
-                      } catch (e) {
-                        alert('Failed to start checkout session')
-                      }
-                    }}
-                  >
-                    {user?.plan_tier === 'pro' ? 'Current Plan' : 'Upgrade to Pro'}
-                  </Button>
+                  {user?.plan_tier === 'pro' ? (
+                    <Button 
+                      className="shrink-0"
+                      onClick={async () => {
+                        try {
+                          const { url } = await import('../services/api').then(m => m.createPortalSession())
+                          window.location.href = url
+                        } catch (e) {
+                          alert('Failed to open billing portal')
+                        }
+                      }}
+                    >
+                      Manage Billing
+                    </Button>
+                  ) : (
+                    <Button 
+                      className="shrink-0"
+                      onClick={async () => {
+                        try {
+                          const { url } = await import('../services/api').then(m => m.createCheckoutSession())
+                          window.location.href = url
+                        } catch (e) {
+                          alert('Failed to start checkout session')
+                        }
+                      }}
+                    >
+                      Upgrade to Pro
+                    </Button>
+                  )}
                 </div>
               </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-3">
                 {[
-                  { label: 'Briefs generated', value: '∞' },
+                  { label: 'Briefs generated', value: quota ? `${quota.used} ${quota.limit === -1 ? '' : `/ ${quota.limit}`}` : '...' },
                   { label: 'Storage used', value: '—' },
                   { label: 'Team members', value: '1' },
                 ].map((stat) => (

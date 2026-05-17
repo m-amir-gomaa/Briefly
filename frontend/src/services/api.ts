@@ -229,6 +229,25 @@ export interface UserProfile {
   plan_tier: string
 }
 
+export interface QuotaInfo {
+  plan: string
+  limit: number
+  used: number
+}
+
+export interface UserAPIKey {
+  id: string
+  name: string
+  key_masked: string
+  provider: string
+  usage_count: number
+  created_at: string
+}
+
+export interface UpdateProfilePayload {
+  agency_name?: string
+}
+
 export async function loginWithEmail(email: string, password: string): Promise<UserProfile> {
   const resp = await apiRequest<{ message: string; user: UserProfile }>('/api/v1/auth/login', {
     method: 'POST',
@@ -251,11 +270,33 @@ export async function fetchMe(): Promise<UserProfile> {
   return apiRequest<UserProfile>('/api/v1/auth/me')
 }
 
-export async function updateProfile(data: { agency_name?: string; gemini_api_key?: string }): Promise<void> {
-  await apiRequest('/api/v1/auth/me', {
+export async function updateProfile(data: UpdateProfilePayload): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>('/api/v1/auth/me', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
+  })
+}
+
+export async function getQuota(): Promise<QuotaInfo> {
+  return apiRequest<QuotaInfo>('/api/v1/auth/quota')
+}
+
+export async function getAPIKeys(): Promise<UserAPIKey[]> {
+  return apiRequest<UserAPIKey[]>('/api/v1/auth/keys')
+}
+
+export async function addAPIKey(name: string, key: string): Promise<UserAPIKey> {
+  return apiRequest<UserAPIKey>('/api/v1/auth/keys', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, key }),
+  })
+}
+
+export async function deleteAPIKey(id: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/api/v1/auth/keys/${id}`, {
+    method: 'DELETE',
   })
 }
 
@@ -266,6 +307,12 @@ export async function logoutUser(): Promise<void> {
 // --- Billing Endpoints ---
 export async function createCheckoutSession(): Promise<{ url: string }> {
   return apiRequest<{ url: string }>('/api/v1/billing/create-checkout', {
+    method: 'POST',
+  })
+}
+
+export async function createPortalSession(): Promise<{ url: string }> {
+  return apiRequest<{ url: string }>('/api/v1/billing/create-portal', {
     method: 'POST',
   })
 }
