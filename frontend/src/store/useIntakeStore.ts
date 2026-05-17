@@ -114,26 +114,73 @@ export const useIntakeStore = create<IntakeState>((set, get) => ({
   },
 
   subscribeToEvents: (id) => {
-    const eventSource = new EventSource(`${API_BASE}/events/${id}`);
-    
-    eventSource.onmessage = (event) => {
-      console.log('SSE Event:', event.data);
-      if (event.data === 'COMPLETED' || event.data === 'FAILED') {
-        set({ status: event.data === 'COMPLETED' ? 'COMPLETED' : 'ERROR' });
-        if (event.data === 'FAILED') set({ errorMessage: 'AI processing failed' });
-        void get().refreshTrackedIntakes(); 
-        void get().fetchIntake(id); 
-        eventSource.close();
-      } else {
-        set({ eventMessage: event.data });
-      }
+    let retryCount = 0;
+    let pollInterval: number | null = null;
+    let eventSource: EventSource | null = null;
+
+    const startPolling = () => {
+      if (pollInterval) return;
+      console.log('SSE permanently failed or disconnected. Falling back to HTTP polling...');
+      
+      pollInterval = window.setInterval(async () => {
+        try {
+          const intake = await getIntake(id);
+          if (intake.status === 'COMPLETED' || intake.status === 'FAILED') {
+            set({ status: intake.status === 'COMPLETED' ? 'COMPLETED' : 'ERROR' });
+            if (intake.status === 'FAILED') set({ errorMessage: 'AI processing failed' });
+            void get().refreshTrackedIntakes();
+            void get().fetchIntake(id);
+            if (pollInterval) {
+              window.clearInterval(pollInterval);
+              pollInterval = null;
+            }
+          }
+        } catch (err) {
+          console.error('Polling error:', err);
+        }
+      }, 4000);
     };
 
-    eventSource.onerror = (err) => {
-      console.error('SSE Error:', err);
-      set({ status: 'ERROR', errorMessage: 'Lost connection to update stream' });
-      eventSource.close();
+    const connectSSE = () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+
+      eventSource = new EventSource(`${API_BASE}/events/${id}`);
+
+      eventSource.onmessage = (event) => {
+        console.log('SSE Event:', event.data);
+        if (event.data === 'COMPLETED' || event.data === 'FAILED') {
+          set({ status: event.data === 'COMPLETED' ? 'COMPLETED' : 'ERROR' });
+          if (event.data === 'FAILED') set({ errorMessage: 'AI processing failed' });
+          void get().refreshTrackedIntakes();
+          void get().fetchIntake(id);
+          eventSource?.close();
+          if (pollInterval) {
+            window.clearInterval(pollInterval);
+            pollInterval = null;
+          }
+        } else if (event.data !== 'keep-alive') {
+          set({ eventMessage: event.data });
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        console.error('SSE Error:', err);
+        eventSource?.close();
+        
+        if (retryCount < 3) {
+          retryCount++;
+          const delay = Math.pow(2, retryCount) * 1000;
+          console.log(`Retrying SSE connection in ${delay}ms (attempt ${retryCount}/3)...`);
+          window.setTimeout(connectSSE, delay);
+        } else {
+          startPolling();
+        }
+      };
     };
+
+    connectSSE();
   },
 
   reset: () => set({
