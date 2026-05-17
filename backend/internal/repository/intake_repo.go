@@ -9,7 +9,7 @@ type IntakeRepository interface {
 	Create(intake *models.Intake) error
 	GetByID(id string) (*models.Intake, error)
 	ListByUserID(userID string) ([]models.Intake, error)
-	UpdateStatus(id string, status models.IntakeStatus) error
+	Update(id string, updates map[string]interface{}) error
 }
 
 type intakeRepository struct {
@@ -36,6 +36,6 @@ func (r *intakeRepository) ListByUserID(userID string) ([]models.Intake, error) 
 	return intakes, err
 }
 
-func (r *intakeRepository) UpdateStatus(id string, status models.IntakeStatus) error {
-	return r.db.Model(&models.Intake{}).Where("id = ?", id).Update("status", status).Error
+func (r *intakeRepository) Update(id string, updates map[string]interface{}) error {
+	return r.db.Model(&models.Intake{}).Where("id = ?", id).Updates(updates).Error
 }

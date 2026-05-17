@@ -73,7 +73,7 @@ func (h *IntakeHandler) SubmitIntake(c *gin.Context) {
 	}
 
 	// 2. Delegate business logic to service
-	intake, err := h.svc.Submit(c, userID, rawText, audioKey, imageKey, user.GeminiAPIKey)
+	intake, err := h.svc.Submit(c, userID, rawText, audioKey, imageKey)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process intake"})
 		return
@@ -137,6 +137,7 @@ func (h *IntakeHandler) UpdateIntakeResults(c *gin.Context) {
 		ConfidenceScore   float32            `json:"confidence_score"`
 		CotLog            string             `json:"cot_log"`
 		IsConfirmed       bool               `json:"is_confirmed"`
+		ProviderName      string             `json:"provider_name"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -144,9 +145,13 @@ func (h *IntakeHandler) UpdateIntakeResults(c *gin.Context) {
 		return
 	}
 
-	// 1. Update Intake status via Repo
-	if err := h.repo.UpdateStatus(idStr, models.IntakeStatusCompleted); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update intake status"})
+	// 1. Update Intake status and provider via Repo
+	updates := map[string]interface{}{
+		"status":        models.IntakeStatusCompleted,
+		"provider_name": req.ProviderName,
+	}
+	if err := h.repo.Update(idStr, updates); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update intake"})
 		return
 	}
 

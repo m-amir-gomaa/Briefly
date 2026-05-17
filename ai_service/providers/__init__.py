@@ -10,6 +10,7 @@ the system automatically falls back to Ollama (local inference), then to the
 hardcoded static fallback so the pipeline never fully dies.
 """
 import os
+import time
 from .gemini_provider import GeminiProvider
 from .ollama_provider import OllamaProvider
 
@@ -24,6 +25,29 @@ _AUTH_ERROR_KEYWORDS = (
     "401", "403", "UNAUTHENTICATED",
     "429", "RESOURCE_EXHAUSTED", "Quota exceeded", "rate limit",
 )
+
+# Circuit breaker map: API Key string -> time.time() until which it is blocked
+_EXHAUSTED_KEYS = {}
+
+
+def mark_key_exhausted(api_key: str, duration: int = 300):
+    """Mark a key as exhausted/rate-limited for a given duration (default 5 minutes)."""
+    if api_key:
+        _EXHAUSTED_KEYS[api_key] = time.time() + duration
+        print(f"  [CircuitBreaker] Key marked as rate-limited/exhausted until {time.ctime(time.time() + duration)}")
+
+
+def is_key_exhausted(api_key: str) -> bool:
+    """Check if the key is currently marked as rate-limited/exhausted."""
+    if not api_key:
+        return False
+    expiry = _EXHAUSTED_KEYS.get(api_key, 0)
+    if expiry > time.time():
+        return True
+    # Clean up expired entry
+    if api_key in _EXHAUSTED_KEYS:
+        del _EXHAUSTED_KEYS[api_key]
+    return False
 
 
 class FallbackProvider:
@@ -46,6 +70,11 @@ class FallbackProvider:
             if any(kw.lower() in err_str.lower() for kw in _AUTH_ERROR_KEYWORDS):
                 print(f"  [FallbackProvider] Primary ({type(self.primary).__name__}) auth error — "
                       f"switching to {type(self.fallback).__name__} (tinyllama)...")
+                
+                # Expose rate-limited key to circuit breaker
+                if hasattr(self.primary, "api_key") and self.primary.api_key:
+                    mark_key_exhausted(self.primary.api_key)
+
                 self.active_name = type(self.fallback).__name__.replace("Provider", "")
                 # Get the prompt template and parser from the chain to rebuild with fallback LLM
                 # chain is a RunnableSequence: prompt | llm | parser
@@ -66,8 +95,23 @@ class FallbackProvider:
 def get_provider(api_key: str = None):
     """Return the configured AI provider instance with automatic fallback."""
     provider_name = os.getenv("AI_PROVIDER", "gemini").lower()
-    provider_cls = _PROVIDER_MAP.get(provider_name, GeminiProvider)
-    primary = provider_cls(api_key=api_key)
+    
+    # Get the key that would be used
+    default_key = os.getenv("DEMO_GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+    effective_key = api_key or default_key
+
+    # Circuit Breaker Check
+    if is_key_exhausted(effective_key):
+        print(f"  [CircuitBreaker] Key is currently rate-limited/exhausted. Routing directly to Ollama.")
+        return OllamaProvider()
+    
+    # If a custom key is provided, we ALWAYS use Gemini as primary,
+    # regardless of the default AI_PROVIDER setting.
+    if api_key:
+        primary = GeminiProvider(api_key=api_key)
+    else:
+        provider_cls = _PROVIDER_MAP.get(provider_name, GeminiProvider)
+        primary = provider_cls()
 
     # Always set up Ollama as a fallback (unless primary IS Ollama)
     if not isinstance(primary, OllamaProvider):
@@ -78,3 +122,4 @@ def get_provider(api_key: str = None):
 
 
 __all__ = ["get_provider"]
+

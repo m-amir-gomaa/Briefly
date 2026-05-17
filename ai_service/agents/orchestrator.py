@@ -103,6 +103,7 @@ class IntakeState(TypedDict):
     tone_profile: str
     retry_count: int
     gemini_api_key: Optional[str]
+    api_key_name: Optional[str]
     provider_name: str
 
 # --- Node Functions ---
@@ -247,12 +248,15 @@ async def node_merge(state: IntakeState) -> IntakeState:
 
 async def node_analyze(state: IntakeState) -> IntakeState:
     print(f"[{state['intake_id']}] Node Analyze")
-    if AI_PROVIDER_NAME in ("fallback", "offline"):
+    
+    # If explicitly offline, use the mock logic immediately
+    if AI_PROVIDER_NAME == "offline" and not state.get("gemini_api_key"):
         apply_fallback_analysis(state)
-        state["provider_name"] = "Fallback/Offline"
+        state["provider_name"] = "Offline Mock"
         return state
 
     provider = get_provider(state.get("gemini_api_key"))
+    state["provider_name"] = getattr(provider, "active_name", provider.__class__.__name__)
     # Use StrOutputParser for robustness — tinyllama may not output clean JSON
     str_parser = StrOutputParser()
     prompt = ChatPromptTemplate.from_template("""
@@ -346,6 +350,10 @@ async def node_finalize(state: IntakeState) -> IntakeState:
     if isinstance(summary_text, list):
         summary_text = " ".join(summary_text)
     
+    cot_log_entry = f"Engine: {state.get('provider_name', 'Unknown')}"
+    if state.get("api_key_name"):
+        cot_log_entry += f" (Key: {state['api_key_name']})"
+
     final_payload = {
         "summary": summary_text,
         "goals": state["goals"],
@@ -355,7 +363,8 @@ async def node_finalize(state: IntakeState) -> IntakeState:
         "tone_profile": state["tone_profile"],
         "confidence_score": 0.95,
         "is_confirmed": False,
-        "cot_log": f"Engine: {state.get('provider_name', 'Unknown')}",
+        "cot_log": cot_log_entry,
+        "provider_name": state.get("provider_name", "Unknown"),
     }
     async with httpx.AsyncClient() as client:
         try:
@@ -435,6 +444,7 @@ async def run_pipeline(payload: dict):
         tone_profile="",
         retry_count=0,
         gemini_api_key=payload.get("gemini_api_key"),
+        api_key_name=payload.get("api_key_name"),
         provider_name="Unknown",
     )
     await app_graph.ainvoke(state)

@@ -47,7 +47,7 @@ if [ -n "$INTAKE_ID" ]; then
     IDATA=$(curl -sf -b "$COOKIES" "$BASE/api/v1/intake/$INTAKE_ID" 2>/dev/null)
     STATUS=$(echo "$IDATA" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("status",""))' 2>/dev/null)
     printf "    [%2d] %s\n" "$i" "$STATUS"
-    if [ "$STATUS" = "completed" ]; then
+    if [ "$STATUS" = "COMPLETED" ]; then
       echo "  ✅ COMPLETED!"
       python3 << PYEOF
 import json, sys
