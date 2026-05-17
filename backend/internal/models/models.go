@@ -40,8 +40,7 @@ type User struct {
 	Email        string    `gorm:"uniqueIndex;not null" json:"email"`
 	AgencyName   string    `json:"agency_name"`
 	PasswordHash string    `json:"-"`
-	GeminiAPIKey string    `json:"-"` // Hidden from JSON
-	GoogleID     string    `gorm:"uniqueIndex" json:"-"`
+	GoogleID     *string   `gorm:"uniqueIndex" json:"-"`
 	AvatarURL    string    `json:"avatar_url"`
 	PlanTier     string    `gorm:"default:'free'" json:"plan_tier"`
 	StripeCustomerID string `json:"-"`
@@ -50,24 +49,28 @@ type User struct {
 }
 
 func (u *User) BeforeSave(tx *gorm.DB) (err error) {
-	if u.GeminiAPIKey != "" {
-		// Only encrypt if it's not already encrypted (simple check)
-		if len(u.GeminiAPIKey) < 32 { // Encrypted strings are much longer
-			encrypted, err := security.Encrypt(u.GeminiAPIKey)
-			if err == nil {
-				u.GeminiAPIKey = encrypted
-			}
-		}
-	}
 	return nil
 }
 
-func (u *User) AfterFind(tx *gorm.DB) (err error) {
-	if u.GeminiAPIKey != "" {
-		decrypted, err := security.Decrypt(u.GeminiAPIKey)
-		if err == nil {
-			u.GeminiAPIKey = decrypted
+type UserAPIKey struct {
+	ID           uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	UserID       uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
+	Name         string    `json:"name"`
+	KeyEncrypted string    `json:"-"`
+	KeyMasked    string    `json:"key_masked"`
+	Provider     string    `gorm:"default:'gemini'" json:"provider"`
+	UsageCount   int       `gorm:"default:0" json:"usage_count"`
+	CreatedAt    time.Time `gorm:"default:now()" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"default:now()" json:"updated_at"`
+}
+
+func (k *UserAPIKey) BeforeSave(tx *gorm.DB) (err error) {
+	if len(k.KeyEncrypted) > 0 && len(k.KeyEncrypted) < 100 { // Naive check to ensure it's not already encrypted
+		encrypted, err := security.Encrypt(k.KeyEncrypted)
+		if err != nil {
+			return err
 		}
+		k.KeyEncrypted = encrypted
 	}
 	return nil
 }
@@ -81,6 +84,7 @@ type Intake struct {
 	AudioURL  string       `json:"audio_url"`
 	ImageURL  string       `json:"image_url"`
 	Status    IntakeStatus `gorm:"type:text;default:'PENDING';not null;index" json:"status"`
+	ProviderName string    `json:"provider_name"`
 	RetryCount int          `gorm:"default:0;not null" json:"retry_count"`
 	CreatedAt time.Time    `gorm:"default:now()" json:"created_at"`
 	UpdatedAt time.Time    `gorm:"default:now()" json:"updated_at"`

@@ -16,7 +16,7 @@ import (
 func getJWTKey() []byte {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		return []byte("default_secret_key_for_dev")
+		panic("FATAL: JWT_SECRET environment variable is not configured. HALTING to prevent unsafe session generation.")
 	}
 	return []byte(secret)
 }

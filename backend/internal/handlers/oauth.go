@@ -112,7 +112,7 @@ func GoogleCallback(c *gin.Context) {
 			user = models.User{
 				Email:      googleUser.Email,
 				AgencyName: googleUser.Name,
-				GoogleID:   googleUser.ID,
+				GoogleID:   &googleUser.ID,
 				AvatarURL:  googleUser.Picture,
 				PlanTier:   "free",
 			}
@@ -175,7 +175,6 @@ func UpdateProfile(c *gin.Context) {
 
 	var req struct {
 		AgencyName   string `json:"agency_name"`
-		GeminiAPIKey string `json:"gemini_api_key"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -185,9 +184,6 @@ func UpdateProfile(c *gin.Context) {
 	updates := map[string]interface{}{}
 	if req.AgencyName != "" {
 		updates["agency_name"] = req.AgencyName
-	}
-	if req.GeminiAPIKey != "" {
-		updates["gemini_api_key"] = req.GeminiAPIKey
 	}
 
 	if err := db.DB.Model(&models.User{}).Where("id = ?", userID).Updates(updates).Error; err != nil {
